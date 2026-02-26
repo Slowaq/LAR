@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<package>
+  <name>robolab_turtlebot</name>
+  <version>0.0.0</version>
+  <description>Package for Turtlebot 2 in Robolab of the Faculty of Electotechnical Engineering of the Czech Technical University in Prague, Czech Republic</description>
+
+  <maintainer email="wagnelib@cvut.cz">Libor Wagner</maintainer>
+  <maintainer email="gael.ecorchard@cvut.cz">Gaël Écorchard</maintainer>
+
+  <license>MIT</license>
+
+  <!-- Url tags are optional, but multiple are allowed, one per tag -->
+  <!-- Optional attribute type can be: website, bugtracker, or repository -->
+  <!-- Example: -->
+  <!-- <url type="website">http://wiki.ros.org/test</url> -->
+
+  <author email="wagnelib@cvut.cz">Libor Wagner</author>
+  <author email="gael.ecorchard@cvut.cz">Gaël Écorchard</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+
+  </export>
+</package>

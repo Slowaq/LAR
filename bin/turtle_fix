@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+# Remember to run this script using the command "source ./filename.sh"
+
+# Search these processes for the session variable
+# (they are run as the current user and have the DBUS session variable set)
+compatiblePrograms=( nautilus kdeinit kded4 pulseaudio trackerd )
+
+get_ip()
+{
+	ip=$(ifconfig wlp1s0 | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1')
+	if [ -z "$ip" ]; then
+		ip='127.0.0.1'
+	fi
+	echo $ip
+}
+
+# The turtle number y is in its IP address, xx.xx.xx.2y.
+get_turtle_number()
+{
+    echo $(get_ip) | cut --delimiter '.' --fields=4 | cut --bytes 2
+}
+
+# Attempt to get a program pid
+for index in ${compatiblePrograms[@]}; do
+    PID=$(pidof -s ${index})
+    if [[ "${PID}" != "" ]]; then
+        break
+    fi
+done
+if [[ "${PID}" == "" ]]; then
+    echo "Could not detect active login session"
+    return 1
+fi
+
+QUERY_ENVIRON="$(tr '\0' '\n' < /proc/${PID}/environ | grep "DBUS_SESSION_BUS_ADDRESS" | cut -d "=" -f 2-)"
+if [[ "${QUERY_ENVIRON}" != "" ]]; then
+    export DBUS_SESSION_BUS_ADDRESS="${QUERY_ENVIRON}"
+    echo "Connected to session:"
+    echo " DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS}"
+else
+    echo "Could not find dbus session ID in user environment."
+    return 1
+fi
+
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+gsettings set org.gnome.settings-daemon.plugins.power button-power shutdown
+gsettings set org.gnome.desktop.screensaver lock-enabled false
+gsettings set org.gnome.desktop.session idle-delay 0
+gsettings set org.gnome.desktop.background picture-uri file:///home/ros/ros_ws/src/robolab_turtlebot/fig/turtle0$(get_turtle_number).png
+
+echo "GSETTINGS:"
+echo " sleep-inactive-ac-timeout " `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout`
+echo " sleep-inactive-battery-timeout " `gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout`
+echo " lock-enabled: `gsettings get org.gnome.desktop.screensaver lock-enabled`"
+echo " idle-delay: `gsettings get org.gnome.desktop.session idle-delay`"
+
+
+# Update repository
+echo "Updating robolab_turtlebot package:"
+(cd ~/ros_ws/src/robolab_turtlebot;
+ git fetch --all
+ git reset --hard origin/master
+ git pull
+
+ (cd ~/ros_ws/src/robolab_turtlebot; git log --oneline --abbrev=2 | head -n 5;)
+)

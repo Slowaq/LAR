@@ -1,0 +1,12 @@
+<launch>
+    <param name="turtlebot_camera" value="d435" />
+    <include file="$(find robolab_turtlebot)/launch/bringup.launch"/>
+    <include file="$(find realsense2_camera)/launch/rs_rgbd.launch">
+        <arg name="depth_width"         value="640"/>
+        <arg name="depth_height"        value="480"/>
+        <arg name="depth_fps"         value="30"/>
+        <arg name="color_width"         value="640"/>
+        <arg name="color_height"        value="480"/>
+        <arg name="color_fps"        value="30"/>
+    </include>
+</launch>

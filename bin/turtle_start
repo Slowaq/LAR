@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+tmux start-server
+tmux new-session -d -s ros
+tmux new-window -t ros:2
+tmux send -t ros:1 "roslaunch robolab_turtlebot bringup.launch" ENTER
+sleep 2
+tmux send -t ros:2 "roslaunch robolab_turtlebot camera.launch" ENTER
+rostopic pub -1 /mobile_base/commands/led1 kobuki_msgs/Led "value: 1"
+

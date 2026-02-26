@@ -1,0 +1,22 @@
+<launch>
+
+  <arg name="hostname" value="$(env HOSTNAME)" />
+
+  <group if="$(eval arg('hostname') in ['turtle01', 'turtle02'])">
+     <param name="turtlebot_camera" value="astra" />
+    <include file="$(find astra_launch)/launch/astra.launch"/>
+    <node name="base_to_cam" pkg="tf" type="static_transform_publisher" args="-0.080 0 0.3 0 0 0 1 base_link camera_link 100" />
+  </group>
+
+  <group if="$(eval arg('hostname') in ['turtle03', 'turtle04', 'turtle05', 'turtle06', 'turtle07'])">
+    <param name="turtlebot_camera" value="r200" />
+    <include file="$(find realsense_camera)/launch/r200_nodelet_rgbd.launch" />
+    <node name="base_to_cam" pkg="tf" type="static_transform_publisher" args="-0.080 0 0.3 0 0 0 1 base_link camera_link 100" />
+  </group>
+
+  <group if="$(eval arg('hostname') in ['turtle08', 'turtle09', 'turtle10', 'turtle11', 'turtle12', 'turtle13'])">
+    <param name="turtlebot_camera" value="d435" />
+    <include file="$(find realsense2_camera)/launch/rs_rgbd.launch"/>
+    <node name="base_to_cam" pkg="tf" type="static_transform_publisher" args="-0.080 0 0.3 0 0 0 1 base_link camera_link 100" />
+  </group>
+</launch>

@@ -1,0 +1,9 @@
+<launch>
+    <param name="turtlebot_camera" value="astra" />
+    <include file="$(find robolab_turtlebot)/launch/bringup.launch"/>
+    <include file="$(find astra_launch)/launch/astra.launch">
+      <arg name="rgb" value="color" />
+      <arg name="depth_registration" value="true" />
+    </include>
+    <node name="base_to_cam" pkg="tf" type="static_transform_publisher" args="-0.080 0 0.3 0 0 0 1 base_link camera_link 100" />
+</launch>
