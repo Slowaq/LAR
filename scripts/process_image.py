@@ -14,7 +14,7 @@ def main() -> None:
 
     files = [f for f in os.listdir(folder_path)]
     for f in files:
-        mat_file = os.path.join(folder_path, files[0])
+        mat_file = os.path.join(folder_path, files[0]) 
         data = scipy.io.loadmat(mat_file)
 
         rgb = data["image_rgb"]
