@@ -2,25 +2,26 @@ import cv2, os
 import numpy as np
 import scipy.io
 import matplotlib.pyplot as plt
+from sys import argv
 
 
 
 def main() -> None:
-    folders = sorted(os.listdir("sample_data"))
-    latest_folder = folders[-1]
 
-    folder_path = os.path.join("sample_data", latest_folder)
+
+    folder_path = os.path.join("sample_data", "recording_0001_mic_a_garaz_tma")
     print("Using folder:", folder_path)
 
-    files = [f for f in os.listdir(folder_path)]
-    for f in files:
-        mat_file = os.path.join(folder_path, files[0]) 
-        data = scipy.io.loadmat(mat_file)
+    i = int(argv[1])
+    filename = f"{i:04d}.mat"
 
-        rgb = data["image_rgb"]
+    mat_file = os.path.join(folder_path, filename) 
+    data = scipy.io.loadmat(mat_file)
 
-        hsv = cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2HSV)
-        print(len(hsv), len(hsv[0]))
+    rgb = data["image_rgb"]
+
+    hsv = cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2HSV)
+    print(len(hsv), len(hsv[0]))
 
 
     
