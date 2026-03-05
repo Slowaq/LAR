@@ -2,26 +2,35 @@ import cv2, os
 import numpy as np
 import scipy.io
 import matplotlib.pyplot as plt
-from sys import argv
 
+def onclick(event):
+
+    if event.xdata is None or event.ydata is None:
+        return
+
+    x = int(event.xdata)
+    y = int(event.ydata)
+
+    print(f"pixel ({x},{y}) -> H={H[y,x]}, S={S[y,x]}, V={V[y,x]}")
 
 
 def main() -> None:
+    global H, S, V
+    folders = sorted(os.listdir("sample_data"))
+    latest_folder = folders[-1]
 
-
-    folder_path = os.path.join("sample_data", "recording_0001_mic_a_garaz_tma")
+    folder_path = os.path.join("sample_data", latest_folder)
     print("Using folder:", folder_path)
 
-    i = int(argv[1])
-    filename = f"{i:04d}.mat"
+    files = [f for f in os.listdir(folder_path)]
+    for f in files:
+        mat_file = os.path.join(folder_path, files[0])
+        data = scipy.io.loadmat(mat_file)
 
-    mat_file = os.path.join(folder_path, filename) 
-    data = scipy.io.loadmat(mat_file)
+        rgb = data["image_rgb"]
 
-    rgb = data["image_rgb"]
-
-    hsv = cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2HSV)
-    print(len(hsv), len(hsv[0]))
+        hsv = cv2.cvtColor(rgb.astype(np.uint8), cv2.COLOR_RGB2HSV)
+        print(len(hsv), len(hsv[0]))
 
 
     
@@ -43,6 +52,9 @@ def main() -> None:
     plt.subplot(1,3,3)
     plt.imshow(V, cmap="gray")
     plt.title("Value")
+
+    fig = plt.gcf()
+    fig.canvas.mpl_connect('button_press_event', onclick)
 
     plt.show()
 
