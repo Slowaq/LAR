@@ -1,8 +1,12 @@
 from robolab_turtlebot import Turtlebot
+import numpy as np
+import cv2
+
+EXIT_ANGULAR_VELOCITY = 0.3
 
 class Algorithm:
     def __init__(self):
-        self.robot = Turtlebot(rgb=True, depth=True)
+        self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
 
     def run(self) -> None:
@@ -25,22 +29,122 @@ class Algorithm:
         """
         The robot orients itself and exits the garage.
         """
-        self.find_exit()
-        self.drive_out_of_garage()
+        if self.find_exit():
+            self.drive_out_of_garage()
+        else:
+            print("Could not exit the garage!")
 
-    def find_exit(self) -> None:
+    def find_exit(self) -> bool:
         """
-        Turn in place towards the garage exit.
-        Preparation for the robot to drive straight out.
+        Rotate the robot until a free direction is detected.
+
+        The function analyzes the depth point cloud and estimates the
+        distance to obstacles in front of the robot. If sufficient free
+        space (>= DISTANCE_DETECTION m) is detected, the robot stops rotating and the
+        function returns True.
+
+        Returns
+        -------
+        bool
+            True if a suitable exit direction was found.
+            False if the ROS node shuts down before detection.
         """
-        pass
+
+        DISTANCE_DETECTION = 0.6
+        exit_found = False        
+
+        print('Waiting for point cloud ...')
+        self.robot.wait_for_point_cloud()
+        print('First point cloud recieved ...')
+
+        # WINDOW = 'obstacles' # Name of the OpenCV display window used to visualize the processed point-cloud image
+        # cv2.namedWindow(WINDOW)
+
+        print("Finding exit")
+        while not self.robot.is_shutting_down():
+            if self.stop:   
+                self.robot.cmd_velocity(0, 0)
+                return False
+
+            # get point cloud
+            pc = self.robot.get_point_cloud()
+
+            if pc is None:
+                print('No point cloud')
+                continue
+
+            # mask out floor points
+            mask = pc[:, :, 1] < 0.2
+
+            # mask point too far
+            mask = np.logical_and(mask, pc[:, :, 2] < 3.0)
+
+            #if np.count_nonzero(mask) <= 0:
+            #    print('All point are too far ...')
+            #    continue
+
+            # # empty image
+            # image = np.zeros(mask.shape)
+
+            # # assign depth i.e. distance to image
+            # image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
+            # im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
+            #                             cv2.COLORMAP_JET)
+
+            # # show image
+            # cv2.imshow(WINDOW, im_color)
+            # cv2.waitKey(1)
+
+            # check obstacle
+            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)
+            data = np.sort(pc[:, :, 2][mask])
+
+            if data.size > 50:
+                dist = np.percentile(data, 10)
+                if dist >= DISTANCE_DETECTION:
+                    exit_found = True
+
+            # exit found
+            if exit_found:
+                print("Exit found!")
+                self.robot.cmd_velocity(0, 0)
+                return True
+
+            # rotate to find exit
+            else:
+                self.robot.cmd_velocity(linear=0, angular=EXIT_ANGULAR_VELOCITY)
+
+        return exit_found
+
 
     def drive_out_of_garage(self) -> None:
         """
         The robot drives straight out a short distance in front of the garage.
         Fixed distance.
+        
+        Returns
+        -------
+            None
         """
-        pass
+        duration = 3.0      # seconds
+        speed = 0.2         # m/s
+
+        start_time = cv2.getTickCount() / cv2.getTickFrequency()
+
+        print("Driving out of garage")
+        while not self.robot.is_shutting_down():
+            current_time = cv2.getTickCount() / cv2.getTickFrequency()
+
+            if current_time - start_time >= duration:
+                break
+
+            if not self.stop:
+                self.robot.cmd_velocity(linear=speed, angular=0)
+            else:
+                self.robot.cmd_velocity(0, 0)
+
+        self.robot.cmd_velocity(0, 0)
+        print("Out of garage!")
 
     def approach_pylon(self) -> None:
         """
