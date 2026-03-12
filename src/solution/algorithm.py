@@ -49,23 +49,21 @@ class Algorithm:
             False if the ROS node shuts down before detection.
         """
 
-        WINDOW = 'obstacles' # Name of the OpenCV display window used to visualize the processed point-cloud image
         DISTANCE_DETECTION = 0.6
-        exit_found = False
-        
+        exit_found = False        
 
         print('Waiting for point cloud ...')
         self.robot.wait_for_point_cloud()
         print('First point cloud recieved ...')
 
-        cv2.namedWindow(WINDOW)
-        cv2.setMouseCallback(WINDOW, self._click)
+        # WINDOW = 'obstacles' # Name of the OpenCV display window used to visualize the processed point-cloud image
+        # cv2.namedWindow(WINDOW)
 
         print("Finding exit")
         while not self.robot.is_shutting_down():
-            if self.stop:   # probably redundant dunno
+            if self.stop:   
                 self.robot.cmd_velocity(0, 0)
-                continue
+                return False
 
             # get point cloud
             pc = self.robot.get_point_cloud()
@@ -84,17 +82,17 @@ class Algorithm:
             #    print('All point are too far ...')
             #    continue
 
-            # empty image
-            image = np.zeros(mask.shape)
+            # # empty image
+            # image = np.zeros(mask.shape)
 
-            # assign depth i.e. distance to image
-            image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
-            im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
-                                        cv2.COLORMAP_JET)
+            # # assign depth i.e. distance to image
+            # image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
+            # im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
+            #                             cv2.COLORMAP_JET)
 
-            # show image
-            cv2.imshow(WINDOW, im_color)
-            cv2.waitKey(1)
+            # # show image
+            # cv2.imshow(WINDOW, im_color)
+            # cv2.waitKey(1)
 
             # check obstacle
             mask = np.logical_and(mask, pc[:, :, 1] > -0.2)
@@ -106,14 +104,15 @@ class Algorithm:
                     exit_found = True
 
             # exit found
-            if (not self.stop) and exit_found:
+            if exit_found:
                 self.robot.cmd_velocity(0, 0)
                 print("Exit found!")
-                return exit_found
+                return True
 
             # rotate to find exit
-            elif (not self.stop) and not exit_found:
+            else:
                 self.robot.cmd_velocity(linear=0, angular=self.exit_angular_vel)
+
         return exit_found
 
 
@@ -202,7 +201,3 @@ class Algorithm:
         Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
         """
         pass
-
-    def _click(self, vent, x, y, flags, param) -> None:
-        self.stop = not self.stop
-        print(self.stop)
