@@ -2,11 +2,12 @@ from robolab_turtlebot import Turtlebot
 import numpy as np
 import cv2
 
+EXIT_ANGULAR_VELOCITY = 0.3
+
 class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
-        self.exit_angular_vel = 0.3  # How fast the robot rotates during finding exit
 
     def run(self) -> None:
         """
@@ -105,13 +106,13 @@ class Algorithm:
 
             # exit found
             if exit_found:
-                self.robot.cmd_velocity(0, 0)
                 print("Exit found!")
+                self.robot.cmd_velocity(0, 0)
                 return True
 
             # rotate to find exit
             else:
-                self.robot.cmd_velocity(linear=0, angular=self.exit_angular_vel)
+                self.robot.cmd_velocity(linear=0, angular=EXIT_ANGULAR_VELOCITY)
 
         return exit_found
 
