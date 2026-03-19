@@ -165,6 +165,13 @@ class Algorithm:
     def drive_around_pylon(self) -> bool:
         """
         The robot performs a predefined circle maneuver.
+
+        Algorithm is 
+        designed for specific scenario where pzlon is in
+        right infront of the robot, e.g. it's in the centre of image, and 
+        pylon is +-61cm fomr depth camera of the robot.
+
+        This implementation doesnt utilise any odometry, it's just hardcoded trajectory.
         """
         if self.stop:
             self.robot.cmd_velocity(0, 0)
