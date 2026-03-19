@@ -1,6 +1,11 @@
 from robolab_turtlebot import Turtlebot
 import numpy as np
 import cv2
+import math
+
+EXIT_ANGULAR_VELOCITY = 0.3
+import numpy as np
+import cv2
 
 EXIT_ANGULAR_VELOCITY = 0.3
 
@@ -157,11 +162,31 @@ class Algorithm:
         """
         pass
 
-    def drive_around_pylon(self) -> None:
+    def drive_around_pylon(self) -> bool:
         """
         The robot performs a predefined circle maneuver.
         """
-        pass
+        if self.stop:
+            self.robot.cmd_velocity(0, 0)
+            return
+
+        def drive_for(duration, linear, angular):
+            start = cv2.getTickCount() / cv2.getTickFrequency()
+            while not self.robot.is_shutting_down() or self.stop:
+                now = cv2.getTickCount() / cv2.getTickFrequency()
+
+                if now - start >= duration:
+                    break
+                
+                self.robot.cmd_velocity(linear=linear, angular=angular)
+                cv2.waitKey(1)
+            self.robot.cmd_velocity(0, 0)
+
+        drive_for(0.9, 0.0, 0.3)
+        drive_for(3.0, 0.2, 0.0)
+        drive_for(4.0, 0.2, 0.8)
+        drive_for(0.9, 0.0, 0.3)
+        drive_for(3.0, 0.2, 0.0)
 
     def return_to_garage(self) -> None:
         """
