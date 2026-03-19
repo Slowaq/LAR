@@ -20,7 +20,7 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        self.exit_garage()
+        #self.exit_garage()
         self.approach_pylon()
         self.drive_around_pylon()
         self.return_to_garage()
@@ -172,21 +172,25 @@ class Algorithm:
 
         def drive_for(duration, linear, angular):
             start = cv2.getTickCount() / cv2.getTickFrequency()
-            while not self.robot.is_shutting_down() or self.stop:
+            while not self.robot.is_shutting_down() and not self.stop:
                 now = cv2.getTickCount() / cv2.getTickFrequency()
 
                 if now - start >= duration:
                     break
                 
                 self.robot.cmd_velocity(linear=linear, angular=angular)
-                cv2.waitKey(1)
+                cv2.waitKey(200)
             self.robot.cmd_velocity(0, 0)
 
-        drive_for(0.9, 0.0, 0.3)
-        drive_for(3.0, 0.2, 0.0)
-        drive_for(4.0, 0.2, 0.8)
-        drive_for(0.9, 0.0, 0.3)
-        drive_for(3.0, 0.2, 0.0)
+        # Calibrated for + 61cm from depth camera
+        drive_for(2, 0.0, -0.6)
+        drive_for(4, 0.2, 0.0)
+        drive_for(1, 0, 0.5)
+        drive_for(6.5, 0.25, 0.6)
+        drive_for(0.5, 0, 0.5)
+        drive_for(3, 0.2, 0.0)
+        drive_for(1.5, 0, -1)
+
 
     def return_to_garage(self) -> None:
         """
