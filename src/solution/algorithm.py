@@ -14,16 +14,15 @@ class Algorithm:
         This function defines the instruction pipeline for the robot, from starting the program
         to successfully parking in the garage.
         """
-        self.wait_for_start_button()
+        self.stop = False
         self.exit_garage()
         self.approach_pylon()
         self.drive_around_pylon()
         self.return_to_garage()
-
-    def wait_for_start_button(self) -> None:
-        """
-        The program waits until the start button is pressed.
-        """
+        if self.stop:
+            print("Algorithm exited early")
+        else:
+            print("Algorithm successfully finished")
 
     def exit_garage(self) -> None:
         """
@@ -132,7 +131,7 @@ class Algorithm:
         start_time = cv2.getTickCount() / cv2.getTickFrequency()
 
         print("Driving out of garage")
-        while not self.robot.is_shutting_down():
+        while not self.robot.is_shutting_down() or not self.stop:
             current_time = cv2.getTickCount() / cv2.getTickFrequency()
 
             if current_time - start_time >= duration:
