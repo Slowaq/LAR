@@ -226,3 +226,12 @@ class Algorithm:
         Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
         """
         pass
+
+    def _go_to_point_using_odometry(self, dest_x, dest_y) -> None:
+        DISTANCE_TOL = 0.1
+
+        while not self.robot.is_shutting_down() or self.stop:
+            odomentry = self.robot.get_odometry()
+            print(odomentry)
+            
+            
