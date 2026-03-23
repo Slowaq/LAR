@@ -9,6 +9,11 @@ import cv2
 
 EXIT_ANGULAR_VELOCITY = 0.3
 
+DISTANCE_TOL = 0.05
+SPEED_TO_THE_POINT = 0.3
+ANGULAR_TO_THE_POINT = 0.3
+
+
 class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
@@ -20,10 +25,12 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        self.exit_garage()
-        self.approach_pylon()
-        self.drive_around_pylon()
-        self.return_to_garage()
+        #self.exit_garage()
+        #self.approach_pylon()
+        #self.drive_around_pylon()
+        #self.return_to_garage()
+
+        self._go_to_point_using_odometry(10, 10)
         if self.stop:
             print("Algorithm exited early")
         else:
@@ -221,17 +228,135 @@ class Algorithm:
         """
         pass
 
-    def _turn_on_the_spot(self) -> None:
+    def _distance_from(self, point1: list, point2: list) -> float:
+        """
+        Helper method used for calculating distance of two 2D points.
+
+        Parameters
+        -------
+            point1: 2D point with coords [x,y]
+
+            point2: 2D point with coords [x,y]
+
+        Returns
+        -------
+            flaot: square root of distance of point1 and point2
+        """
+
+        dx = point1[0] - point2[0]
+        dy = point1[1] - point2[1]
+        return math.hypot(dx,dy)
+
+    def _normalize_angle(self, angle: float) -> float:
+        """
+        Helper method used for ensuring engle is in range (-pi,pi]
+
+        Returns
+        -------
+            float: normalized angle in range (-pi,pi]
+        """
+        return (angle + math.pi) % (2 * math.pi) - math.pi
+    
+    def _rotate_towards_point(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> None:
         """
         Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
+        Method utilizes odometry to reliably turn the desired amount. 
+
+        Parameters
+        -------
+            target_delta_yaw: desired change in orintation ( yaw ), units = [rad]
+
+            angular_speed: angular velocity, units = [rad/s]
+                           positive -> counterclokwise
+                           negative -> clockwise
+        Returns
+        -------
+            None
         """
-        pass
+        print(f"Rotaing towards point {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
 
-    def _go_to_point_using_odometry(self, dest_x, dest_y) -> None:
-        DISTANCE_TOL = 0.1
+        start = self.robot.get_odometry()
+        if start is None:
+            return
 
-        while not self.robot.is_shutting_down() or self.stop:
-            odomentry = self.robot.get_odometry()
-            print(odomentry)
+        start_yaw = start[2]
+        direction = 1 if angular_speed > 0 else -1
+
+        while not self.robot.is_shutting_down() and not self.stop:
+            # keep rotating when waitng for odometry
+            self.robot.cmd_velocity(0, angular_speed)
+            # timeout for letting ROS process the incoming odometry
+            cv2.waitKey(10)
+
+            odom = self.robot.get_odometry()
+            if odom is None:
+                continue
+
+            dyaw = self._normalize_angle(odom[2] - start_yaw)
+            print(f"dyaw: {dyaw}")
+
+            if direction > 0 and dyaw >= target_delta_yaw:
+                break
+            if direction < 0 and dyaw <= -target_delta_yaw:
+                break
+
+            self.robot.cmd_velocity(0, angular_speed)
+
+        self.robot.cmd_velocity(0, 0)
+
+    def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = SPEED_TO_THE_POINT) -> bool:
+        print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
+
+        while not self.robot.is_shutting_down():
+            if self.stop:   
+                self.robot.cmd_velocity(0, 0)
+                return False
+
+            # keep rotating when waitng for odometry
+            self.robot.cmd_velocity(speed, 0)
+            # timeout for letting ROS process the incoming odometry
+            cv2.waitKey(10)
+
+            current = self.robot.get_odometry()
+            if current is None:
+                continue
+            print(f"Position: (x={current[0]}, y={current[1]})")
+
+            distance = self._distance_from(current, [dest_x, dest_y])
+            print(f"Distance from dest: {distance}")
+
+            # Check if we reached the destination
+            if distance < DISTANCE_TOL:
+                self.robot.cmd_velocity(0, 0)
+                return True
+
+        return False
+
+    def _go_to_point_using_odometry(self, dest_x: float, dest_y: float) -> bool:
+        print(f"Driving to point: ({dest_x:.2f}, {dest_y:.2f})")
+
+        while not self.robot.is_shutting_down():
+            if self.stop:   
+                self.robot.cmd_velocity(0, 0)
+                return False
             
+            current_odom = self.robot.get_odometry()
+            if current_odom is None:
+                continue # potential problem, robot might stop for a moment
+
+            current_x, current_y = current_odom[0], current_odom[1]
+
+            # Calculate the required angle to face the destination
+            target_angle = math.atan2(dest_y - current_y, dest_x - current_x)
+            print(f"Target angle: {target_angle}")
+
+            # ROtate towards point
+            if not self._rotate_towards_point(target_angle):
+                return False
             
+            # Drive to the point
+            if not self._drive_to_the_point(dest_x, dest_y):
+                return False
+
+            print("Destination reached successfully!")
+            return True
