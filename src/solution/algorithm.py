@@ -9,9 +9,9 @@ import cv2
 
 EXIT_ANGULAR_VELOCITY = 0.3
 
-DISTANCE_TOL = 0.05
+DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
-ANGULAR_TO_THE_POINT = 0.3
+ANGULAR_TO_THE_POINT = 0.7
 
 
 class Algorithm:
@@ -29,8 +29,10 @@ class Algorithm:
         #self.approach_pylon()
         #self.drive_around_pylon()
         #self.return_to_garage()
-
-        self._go_to_point_using_odometry(10, 10)
+        self.robot.reset_odometry()
+        cv2.waitKey(200)  # let it settle
+        origin = self.robot.get_odometry()
+        self._go_to_point_using_odometry(origin[0], origin[1]+1)
         if self.stop:
             print("Algorithm exited early")
         else:
@@ -257,7 +259,7 @@ class Algorithm:
         """
         return (angle + math.pi) % (2 * math.pi) - math.pi
     
-    def _rotate_towards_point(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> None:
+    def _rotate_towards_point(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
         """
         Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
         Method utilizes odometry to reliably turn the desired amount. 
@@ -280,7 +282,6 @@ class Algorithm:
             return
 
         start_yaw = start[2]
-        direction = 1 if angular_speed > 0 else -1
 
         while not self.robot.is_shutting_down() and not self.stop:
             # keep rotating when waitng for odometry
@@ -295,14 +296,23 @@ class Algorithm:
             dyaw = self._normalize_angle(odom[2] - start_yaw)
             print(f"dyaw: {dyaw}")
 
-            if direction > 0 and dyaw >= target_delta_yaw:
-                break
-            if direction < 0 and dyaw <= -target_delta_yaw:
+            angle_error = self._normalize_angle(target_delta_yaw - dyaw)
+
+            if abs(angle_error) < 0.05:  # ~3 degree tolerance
                 break
 
-            self.robot.cmd_velocity(0, angular_speed)
+
+            # slow down near the end of rotation
+            angle_error = self._normalize_angle(target_delta_yaw - dyaw)
+
+            angular = 2.0 * angle_error   # proportional gain
+            angular = max(min(angular, 0.5), -0.5)  # clamp
+
+            self.robot.cmd_velocity(0, angular)
+            angular_speed=angular
 
         self.robot.cmd_velocity(0, 0)
+        return True
 
     def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = SPEED_TO_THE_POINT) -> bool:
         print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
@@ -346,12 +356,17 @@ class Algorithm:
 
             current_x, current_y = current_odom[0], current_odom[1]
 
+            current_yaw = current_odom[2]
+
             # Calculate the required angle to face the destination
             target_angle = math.atan2(dest_y - current_y, dest_x - current_x)
             print(f"Target angle: {target_angle}")
 
+            delta_yaw = self._normalize_angle(target_angle - current_yaw)
+
             # ROtate towards point
-            if not self._rotate_towards_point(target_angle):
+            angular_speed = ANGULAR_TO_THE_POINT if delta_yaw > 0 else -ANGULAR_TO_THE_POINT            
+            if not self._rotate_towards_point(delta_yaw, angular_speed=angular_speed):
                 return False
             
             # Drive to the point
