@@ -9,6 +9,10 @@ import cv2
 
 EXIT_ANGULAR_VELOCITY = 0.3
 
+# accounting for noise in odmetry
+POS_TOL = 0.05      # 5 cm
+ANG_TOL = 0.1       # ~6°
+
 class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
@@ -198,6 +202,65 @@ class Algorithm:
         drive_for(3, 0.2, 0.0)
         drive_for(1.5, 0, -1)
 
+    def drive_around_pylon_odo(self) -> bool:
+        """
+        The robot performs a predefined circle maneuver UTILIZING ODOMOETRY.
+
+        Algorithm is designed for specific scenario where pylon is
+        right infront of the robot, e.g. it's in the centre of image, and 
+        pylon is +-61cm form depth camera of the robot.
+
+        """
+        if self.stop:
+            self.robot.cmd_velocity(0,0)
+            return False
+    
+        self.robot.reset_odometry()
+        self.robot.wait_for_odometry()
+
+        # Save starting pose
+        start = self.robot.get_odometry()
+        start_xy = (start[0], start[1])
+        start_yaw = start[2]
+
+        # Pick radius based on robot + pylon clearance
+        R = 0.25  # meters, adjust as needed
+        v = 0.20
+        w = v / R
+
+        self._turn_on_the_spot(math.pi, -0.8)
+        self._drive_forward(0.3, 1)
+
+        reached_start_once = False
+        while not self.robot.is_shutting_down() and not self.stop:
+            odom = self.robot.get_odometry()
+            if odom is None:
+                continue
+
+            current_xy = (odom[0], odom[1])
+            current_yaw = odom[2]
+
+            # Distance to start
+            dist = self._distance_from(start_xy, current_xy)
+
+            # Angle difference
+            dyaw = abs(self._normalize_angle(current_yaw - start_yaw))
+
+            # Detect that we left start area first
+            if dist > 0.2:
+                reached_start_once = True
+
+            # Stop condition: returned to start
+            if reached_start_once and dist < POS_TOL and dyaw < ANG_TOL:
+                break
+
+            # Drive circular trajectory
+            self.robot.cmd_velocity(v, -w)
+
+        self.robot.cmd_velocity(0,0)
+        return True
+
+
 
     def return_to_garage(self) -> None:
         """
@@ -226,14 +289,105 @@ class Algorithm:
         """
         pass
 
-    def _drive_forward(self) -> None:
+    def _distance_from(self, point1: list, point2: list) -> float:
         """
-        Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
-        """
-        pass
+        Helper method used for calculating distance of two 2D points.
 
-    def _turn_on_the_spot(self) -> None:
+        Parameters
+        -------
+            point1: 2D point with coords [x,y]
+
+            point2: 2D point with coords [x,y]
+
+        Returns
+        -------
+            flaot: square root of distance of point1 and point2
+        """
+
+        dx = point1[0] - point2[0]
+        dy = point1[1] - point2[1]
+        return math.hypot(dx,dy)
+    
+    def _normalize_angle(self, angle: float) -> float:
+        """
+        Helper method used for ensuring engle is in range (-pi,pi]
+
+        Returns
+        -------
+            float: normalized angle in range (-pi,pi]
+        """
+        return (angle + math.pi) % (2 * math.pi) - math.pi
+
+    def _drive_forward(self, target_distance: float, speed: float) -> None:
         """
         Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
+        Method utilizes odometry to reliably drive forward the desired amount. 
+
+        Parameters
+        -------
+            target_distance: desired change in position, units = [m]
+
+            speed:  selfexplanatory, units = [m/s]
+        Returns
+        -------
+            None
         """
-        pass
+        start = self.robot.get_odometry()
+        if start is None:
+            return
+        
+        start_xy = (start[0], start[1])
+
+        while not self.robot.is_shutting_down() and not self.stop:
+            odom = self.robot.get_odometry()
+            if odom is None:
+                continue
+
+            dist = self._distance_from(start_xy, (odom[0], odom[1]))
+            if dist >= target_distance:
+                break
+
+            self.robot.cmd_velocity(speed, 0)
+
+        self.robot.cmd_velocity(0, 0)
+
+    def _turn_on_the_spot(self,target_delta_yaw: float, angular_speed: float) -> None:
+        """
+        Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
+        Method utilizes odometry to reliably turn the desired amount. 
+
+        Parameters
+        -------
+            target_delta_yaw: desired change in orintation ( yaw ), units = [rad]
+
+            angular_speed: angular velocity, units = [rad/s]
+                           positive -> counterclokwise
+                           negative -> clockwise
+        Returns
+        -------
+            None
+        """
+
+        start = self.robot.get_odometry()
+        if start is None:
+            return
+
+        start_yaw = start[2]
+        direction = 1 if angular_speed > 0 else -1
+
+        while not self.robot.is_shutting_down() and not self.stop:
+            odom = self.robot.get_odometry()
+            if odom is None:
+                continue
+
+            dyaw = self._normalize_angle(odom[2] - start_yaw)
+
+            if direction > 0 and dyaw >= target_delta_yaw:
+                break
+            if direction < 0 and dyaw <= -target_delta_yaw:
+                break
+
+            self.robot.cmd_velocity(0, angular_speed)
+
+        self.robot.cmd_velocity(0, 0)
+        
