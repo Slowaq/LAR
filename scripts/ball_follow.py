@@ -5,6 +5,7 @@ import cv2
 WINDOW = "view"
 
 def main():
+    print("main started")
     turtle = Turtlebot(rgb=True, pc=True)
     turtle.wait_for_rgb_image()
 
@@ -14,12 +15,15 @@ def main():
     cv2.namedWindow("camera")
     cv2.namedWindow("depth")
 
+    print("window created")
+
     target_distance = 0.6  # 60 cm
     stoping = True
 
 
     while not turtle.is_shutting_down() and stoping == False:
 
+        print("doing")
         # --- RGB OBRAZ ---
         frame = turtle.get_rgb_image()
         if frame is None:
