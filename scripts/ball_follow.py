@@ -9,7 +9,7 @@ def main():
     turtle = Turtlebot(rgb=True, pc=True)
     turtle.wait_for_rgb_image()
 
-    response = 0.002
+    RESPONSE = 0.002
     rate = Rate(10)
 
     cv2.namedWindow("camera")
@@ -18,10 +18,10 @@ def main():
     print("window created")
 
     target_distance = 0.6  # 60 cm
-    stoping = True
+    stoping = False
 
 
-    while not turtle.is_shutting_down() and stoping == False:
+    while not turtle.is_shutting_down() and not stoping:
 
         print("doing")
         # --- RGB OBRAZ ---
@@ -53,27 +53,32 @@ def main():
         error, x, y, frame = find_pylon(frame)
                 
         if error is not None:
-            angular = -response * error
+            angular = -RESPONSE * error
+            continue
         else:
             angular = 0.3  # hľadanie objektu
 
                 # --- ZÍSKANIE VZDIALENOSTI Z POINT CLOUDU ---
                 # ochrana proti indexu mimo rozsah
+
         h, w, _ = pc.shape
-        if y >= h or x >= w:
-            distance = None
-        else:
-            distance = pc[y, x, 2]  # Z = vzdialenosť dopredu
+        # if y >= h or x >= w:
+        #     print("womething is fucvked up")
+        #     distance = None
+        # else:
+        distance = pc[y, x, 2]  # Z = vzdialenosť dopredu
+        print(f"Shape: {pc.shape}")  # (480, 640, 3)
+
 
                 # ak máme validnú vzdialenosť
-        if distance is not None and not np.isnan(distance):
-
+        if distance is not None:
                     # riadenie dopredného pohybu
+            print(f"distance: {distance}, target_distace: {target_distance}")
             if distance > target_distance:
                 if abs(error) < 50:
-                    linear = 0.1
+                    linear = 0.1    # jedem dopredu
                 else:
-                    linear = 0.0
+                    linear = 0.0    # jenom otaceni
             else:
                     linear = 0.0  # zastav
                     stoping = False
@@ -83,6 +88,8 @@ def main():
                                 (x - 40, y - 20),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                                 (255,255,255), 1)
+        else:
+            print(" distance is None")
 
         turtle.cmd_velocity(linear=linear, angular=angular)
 
@@ -96,8 +103,6 @@ def main():
     cv2.destroyAllWindows()
 
 
-if __name__ == '__main__':
-    main()
 
 def find_pylon(frame):
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
@@ -133,3 +138,8 @@ def find_pylon(frame):
             return error, x, y, frame_bgr
 
     return None, None, None, frame_bgr
+
+
+
+if __name__ == '__main__':
+    main()
