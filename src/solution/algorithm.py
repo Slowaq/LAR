@@ -316,27 +316,50 @@ class Algorithm:
     def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = SPEED_TO_THE_POINT) -> bool:
         print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
 
+        Kp_ang = 2.0   # proportional gain for heading correction
+        max_ang = 0.5  # angular velocity clamp
+
         while not self.robot.is_shutting_down():
             if self.stop:   
                 self.robot.cmd_velocity(0, 0)
                 return False
 
-            # keep rotating when waitng for odometry
-            self.robot.cmd_velocity(speed, 0)
-            # timeout for letting ROS process the incoming odometry
+            # wait for odometry
             cv2.waitKey(10)
 
             current = self.robot.get_odometry()
             if current is None:
                 continue
 
-            distance = self._distance_from(current, [dest_x, dest_y])
-            print(f"Position: (x={current[0]:.2f}, y={current[1]:.2f}, phi={current[2]:.2f}), distance from destination={distance:.2f}")
+            x, y, yaw = current
 
-            # Check if we reached the destination
+            # distance to goal
+            distance = self._distance_from(current, [dest_x, dest_y])
+
+            # desired heading
+            desired_yaw = math.atan2(dest_y - y, dest_x - x)
+
+            # heading error
+            angle_error = self._normalize_angle(desired_yaw - yaw)
+
+            print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
+                f"distance={distance:.2f}, angle_error={angle_error:.2f}")
+
+            # stop condition
             if distance < DISTANCE_TOL:
                 self.robot.cmd_velocity(0, 0)
                 return True
+
+            # proportional angular correction
+            angular = Kp_ang * angle_error
+            angular = max(min(angular, max_ang), -max_ang)  # Clamp
+
+            # optional: slow down when badly misaligned
+            linear = speed
+            if abs(angle_error) > 0.5:  # ~30 degrees
+                linear = 0.0  # rotate in place if very off
+
+            self.robot.cmd_velocity(linear, angular)
 
         return False
 
