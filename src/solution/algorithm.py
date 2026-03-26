@@ -18,6 +18,7 @@ class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
+        self.robot.reset_odometry()
 
     def run(self) -> None:
         """
@@ -29,10 +30,9 @@ class Algorithm:
         #self.approach_pylon()
         #self.drive_around_pylon()
         #self.return_to_garage()
-        self.robot.reset_odometry()
         cv2.waitKey(200)  # let it settle
         origin = self.robot.get_odometry()
-        self._go_to_point_using_odometry(origin[0], origin[1]+1)
+        self._go_to_point_using_odometry(0, 0)
         if self.stop:
             print("Algorithm exited early")
         else:
@@ -266,7 +266,7 @@ class Algorithm:
 
         Parameters
         -------
-            target_delta_yaw: desired change in orintation ( yaw ), units = [rad]
+            target_delta_yaw: desired change in orintation ( yaw ), units = [rad], absolute value
 
             angular_speed: angular velocity, units = [rad/s]
                            positive -> counterclokwise
@@ -277,33 +277,32 @@ class Algorithm:
         """
         print(f"Rotaing towards point {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
 
+        self.robot.wait_for_odometry()
         start = self.robot.get_odometry()
         if start is None:
-            return
+            # Shouldnt ever happen
+            print("Odometry is None")
+            return False
 
         start_yaw = start[2]
 
         while not self.robot.is_shutting_down() and not self.stop:
-            # keep rotating when waitng for odometry
-            self.robot.cmd_velocity(0, angular_speed)
-            # timeout for letting ROS process the incoming odometry
-            cv2.waitKey(10)
-
             odom = self.robot.get_odometry()
             if odom is None:
+                # Shouldnt ever happen
+                print("Odometry is None")
                 continue
 
             dyaw = self._normalize_angle(odom[2] - start_yaw)
-            print(f"dyaw: {dyaw}")
 
             angle_error = self._normalize_angle(target_delta_yaw - dyaw)
 
             if abs(angle_error) < 0.05:  # ~3 degree tolerance
                 break
 
-
             # slow down near the end of rotation
             angle_error = self._normalize_angle(target_delta_yaw - dyaw)
+            print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
 
             angular = 2.0 * angle_error   # proportional gain
             angular = max(min(angular, 0.5), -0.5)  # clamp
@@ -330,10 +329,9 @@ class Algorithm:
             current = self.robot.get_odometry()
             if current is None:
                 continue
-            print(f"Position: (x={current[0]}, y={current[1]})")
 
             distance = self._distance_from(current, [dest_x, dest_y])
-            print(f"Distance from dest: {distance}")
+            print(f"Position: (x={current[0]:.2f}, y={current[1]:.2f}, phi={current[2]:.2f}), distance from destination={distance:.2f}")
 
             # Check if we reached the destination
             if distance < DISTANCE_TOL:
@@ -367,11 +365,17 @@ class Algorithm:
             # ROtate towards point
             angular_speed = ANGULAR_TO_THE_POINT if delta_yaw > 0 else -ANGULAR_TO_THE_POINT            
             if not self._rotate_towards_point(delta_yaw, angular_speed=angular_speed):
+                print("Rotating towards point failed.")
                 return False
+            else:
+                print("Successfully rotated towards point.")
             
             # Drive to the point
             if not self._drive_to_the_point(dest_x, dest_y):
+                print("Driving towards point failed.")
                 return False
+            else:
+                print("Successfully drove towards point.")
 
             print("Destination reached successfully!")
             return True
