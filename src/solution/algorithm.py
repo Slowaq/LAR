@@ -1,8 +1,9 @@
 from robolab_turtlebot import Turtlebot
+from .segmentation import *
 
 class Algorithm:
     def __init__(self):
-        self.robot = Turtlebot(rgb=True, depth=True)
+        self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
 
     def run(self) -> None:
@@ -10,11 +11,11 @@ class Algorithm:
         This function defines the instruction pipeline for the robot, from starting the program
         to successfully parking in the garage.
         """
-        self.wait_for_start_button()
-        self.exit_garage()
+        # self.wait_for_start_button()
+        # self.exit_garage()
         self.approach_pylon()
-        self.drive_around_pylon()
-        self.return_to_garage()
+        # self.drive_around_pylon()
+        # self.return_to_garage()
 
     def wait_for_start_button(self) -> None:
         """
@@ -46,13 +47,93 @@ class Algorithm:
         """
         Finds the ball and drives to it to a certain distance.
         """
-        self.find_pylon()
+        self.robot.wait_for_rgb_image()
 
-    def find_pylon(self) -> None:
-        """
-        Turns the robot in place so that the ball is directly in front of it.
-        """
-        pass
+        RESPONSE = 0.003
+
+        target_distance = 0.5  # 50 cm
+        stoping = False
+
+
+        while not self.robot.is_shutting_down() and not self.stop and not stoping:
+            # --- RGB OBRAZ ---
+            frame = self.robot.get_rgb_image()
+            if frame is None:
+                print("No RGB image")
+                continue
+
+            # --- POINT CLOUD ---
+            pc = self.robot.get_point_cloud()
+            if pc is None:
+                print("Pointcloud is None")
+                continue
+
+            image = np.zeros(pc.shape[:2])
+
+            mask = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
+
+            image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
+
+            depth_vis = cv2.applyColorMap(
+                255 - image.astype(np.uint8),
+                cv2.COLORMAP_JET
+            )     # used only for visualization
+
+            linear = 0.0
+            angular = 0.0
+                    
+            error, x, y, frame = find_pylon(frame)
+                    
+            if error is None:
+                angular = 0.3  # hľadanie objektu
+            else:
+                angular = -RESPONSE * error
+                
+
+            # --- ZÍSKANIE VZDIALENOSTI Z POINT CLOUDU ---
+
+            if x is not None and y is not None: 
+                distance = pc[y, x, 2]  # Z = vzdialenosť dopredu, pc.shape = (480, 640, 3)
+            else:
+                distance = None
+
+            # ak máme validnú vzdialenosť
+            if distance is not None and not np.isnan(distance):
+                # riadenie dopredného pohybu    
+                print(f"distance: {distance:.2f}, target_distace: {target_distance:.2f}")
+                if distance > target_distance:
+                    if abs(error) < 100:
+                        print("Going after target")
+                        linear = 0.1    # jedem dopredu
+                    else:
+                        print("Angular error is too large - turning on the spot")
+                        linear = 0.0    # jenom otaceni
+                else:
+                        print("Close enough to the target - stopping")
+                        linear = 0.0  # zastav
+                        stoping = True
+
+                        # debug info
+                cv2.putText(frame, f"dist: {distance:.2f} m",
+                                    (x - 40, y - 20),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5,
+                                    (255,255,255), 1)
+                
+            # Nemame validni vzdalenost - tocime se na miste a hledame pylon
+            else:
+                pass
+                print("Distance is None - searching for pylon")
+
+            print(f"linear={linear:.2f}, angular={angular:.2f}\n")
+            self.robot.cmd_velocity(linear=linear, angular=angular)
+
+            combined = np.hstack((frame, depth_vis))
+            cv2.imshow("combined", combined)
+            cv2.waitKey(1)
+
+        cv2.destroyAllWindows()
+
+
 
     def drive_around_pylon(self) -> None:
         """

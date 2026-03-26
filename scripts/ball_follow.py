@@ -2,8 +2,6 @@ from robolab_turtlebot import Turtlebot, Rate
 import numpy as np
 import cv2
 
-WINDOW = "view"
-
 def main():
     print("main started")
     turtle = Turtlebot(rgb=True, pc=True)
@@ -17,7 +15,7 @@ def main():
 
     while not turtle.is_shutting_down() and not stoping:
         # --- RGB OBRAZ ---
-        frame = turtle.get_rgb_image()
+        frame = turtle.get_rgb_image() 
         if frame is None:
             print("No RGB image")
             continue
