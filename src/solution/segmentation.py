@@ -1,21 +1,39 @@
 import numpy as np
 import cv2
 
-BALL_HSV_REFERENCE = np.array([74, 129, 110])
-HSV_TOLERANCES = np.array([10, 60, 60])
+def find_pylon(frame):
+    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
-def find_ball_segments(hsv: np.ndarray) -> np.ndarray:
-    # Compute absolute differences for H, and thresholds for S and V
-    h_diff = np.abs(hsv[:, :, 0].astype(int) - BALL_HSV_REFERENCE[0])
-    s_mask = hsv[:, :, 1] > HSV_TOLERANCES[1]
-    v_mask = hsv[:, :, 2] > HSV_TOLERANCES[2]
+    lower_green = np.array([35, 70, 70])
+    upper_green = np.array([90, 255, 255])
 
-    print(f"pixel HSV (362, 382) is {hsv[382, 362, :]}")
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5,5), np.uint8))
 
-    # Combine all conditions
-    mask = (h_diff < HSV_TOLERANCES[0]) & s_mask & v_mask
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Convert to uint8 black-and-white image
-    bw_image = mask.astype(np.uint8) * 255
-    print(f"pixel BW (362, 382) is {bw_image[382, 362]}")
-    return bw_image
+    if contours:
+        cnt = max(contours, key=cv2.contourArea)
+        area = cv2.contourArea(cnt)
+
+        if area > 300:
+            ((x, y), radius) = cv2.minEnclosingCircle(cnt)
+            x, y = int(x), int(y)
+
+            width = frame.shape[1]
+            center_x = width // 2 + 50
+            error = x - center_x
+
+            # kreslenie
+            cv2.circle(frame_bgr, (x, y), int(radius), (0,255,0), 2)
+            cv2.circle(frame_bgr, (x, y), 3, (0,0,255), -1)
+            cv2.line(frame_bgr, (center_x, 0),
+                     (center_x, frame.shape[0]), (255,0,0), 2)
+
+            print(f"Found pylon: error={error:.2f}, x={x:.2f}, y={y:.2f}")
+            return error, x, y, frame_bgr
+
+    print("Couldnt find pylon")
+    return None, None, None, frame_bgr
