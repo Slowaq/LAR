@@ -189,6 +189,35 @@ class Algorithm:
         drive_for(0.9, 0.0, 0.3)
         drive_for(3.0, 0.2, 0.0)
 
+    def drive_around_pylon_using_odometry(self) -> bool:
+        """
+        Hardcoded maneuver to drive around the pylon using odometry feedback. 
+        The robot drives in a rectangle around the pylon and then returns to the starting point.
+
+        Starting point: 28cm in front of the pylon, centered. 
+        """
+        print("Driving around pylon using odometry")
+
+        self.robot.wait_for_odometry()
+        start_odom = self.robot.get_odometry()
+        if start_odom is None:
+            print("Odometry is None")
+            return False
+        
+        start_x, start_y = start_odom[0], start_odom[1]
+        # drive in a rectangle around the pylon 
+        if not self._go_to_point_using_odometry(start_x, start_y + 0.33):
+            return False
+        if not self._go_to_point_using_odometry(start_x + 0.65, start_y + 0.33):
+            return False
+        if not self._go_to_point_using_odometry(start_x + 0.65, start_y - 0.33):
+            return False
+        if not self._go_to_point_using_odometry(start_x, start_y - 0.33):
+            return False
+        if not self._go_to_point_using_odometry(start_x, start_y):
+            return False
+        return True
+    
     def return_to_garage(self) -> None:
         """
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
