@@ -16,18 +16,17 @@ class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
-        self.robot.reset_odometry()
 
     def run(self) -> None:
         """
         This function defines the instruction pipeline for the robot, from starting the program
         to successfully parking in the garage.
         """
-        # self.wait_for_start_button()
-        # self.exit_garage()
+        self.exit_garage()
+        self.robot.reset_odometry()
         self.approach_pylon()
-        # self.drive_around_pylon()
-        # self.return_to_garage()
+        self.drive_around_pylon()
+        self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
@@ -274,7 +273,6 @@ class Algorithm:
         """
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
         """
-        self.find_garage_entrance()
         self.approach_garage()
         self.park_into_garage()
 
@@ -289,7 +287,7 @@ class Algorithm:
         The robot drives in front of the garage door. After this function, it should be enough
         to drive straight into the garage.
         """
-        pass
+        self._go_to_point_using_odometry(0, 0)
 
     def park_into_garage(self) -> None:
         """
