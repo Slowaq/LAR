@@ -9,6 +9,7 @@ DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
 ANGULAR_TO_THE_POINT_CLAMP = 0.5
+MINIMAL_ANGULAR = 0.05
 KP_ANG = 2.0   # proportional gain for heading correction
 
 
@@ -134,21 +135,10 @@ class Algorithm:
         -------
             None
         """
-        duration = 3.0      # seconds
-        speed = 0.2         # m/s
+        DISTANCE = 0.5 # 40 cm
 
-        start_time = cv2.getTickCount() / cv2.getTickFrequency()
-
-        print("Driving out of garage")
-        while not self.robot.is_shutting_down() and not self.stop:
-            current_time = cv2.getTickCount() / cv2.getTickFrequency()
-
-            if current_time - start_time >= duration:
-                break
-
-            self.robot.cmd_velocity(linear=speed, angular=0)
-
-        self.robot.cmd_velocity(0, 0)
+        self.robot.reset_odometry()
+        self._go_to_point_using_odometry(DISTANCE, 0)
         
 
     def approach_pylon(self) -> None:
@@ -255,19 +245,29 @@ class Algorithm:
         if start_odom is None:
             print("Odometry is None")
             return False
-        
-        start_x, start_y = start_odom[0], start_odom[1]
-        # drive in a rectangle around the pylon 
-        if not self._go_to_point_using_odometry(start_x, start_y + 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x + 0.65, start_y + 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x + 0.65, start_y - 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x, start_y - 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x, start_y):
-            return False
+
+        start_x, start_y, start_phi = start_odom
+
+        # Rectangle in robot frame (forward = x, left = y)
+        points_local = [
+            (0.0,  0.33),
+            (0.75, 0.33),
+            (0.75, -0.33),
+            (0.0, -0.33),
+        ]
+
+        # Convert to global frame
+        points_global = []
+        for x, y in points_local:
+            x_transformed = start_x + x * math.cos(start_phi) - y * math.sin(start_phi)
+            y_transformed = start_y + x * math.sin(start_phi) + y * math.cos(start_phi)
+            points_global.append((x_transformed, y_transformed))
+
+        # Execute path
+        for x_transformed, y_transformed in points_global:
+            if not self._go_to_point_using_odometry(x_transformed, y_transformed):
+                return False
+
         return True
     
     def return_to_garage(self) -> None:
@@ -387,6 +387,8 @@ class Algorithm:
 
             angular = KP_ANG * angle_error   # proportional gain
             angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # clamp
+            if -MINIMAL_ANGULAR < angular < MINIMAL_ANGULAR:
+                angular = MINIMAL_ANGULAR if angular > 0 else -MINIMAL_ANGULAR
 
             self.robot.cmd_velocity(0, angular)
             angular_speed=angular
