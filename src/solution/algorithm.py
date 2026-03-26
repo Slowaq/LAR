@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import math
 
-EXIT_ANGULAR_VELOCITY = 0.3
+EXIT_ANGULAR_VELOCITY = 0.2
 DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
@@ -59,11 +59,10 @@ class Algorithm:
             False if the ROS node shuts down before detection.
         """
 
-        FREE_TH = 0.65
-        WALL_TH = 0.55
+        FREE_TH = 0.50
         first_wall_end_yaw = None
         second_wall_yaw = None
-        in_free_space = False    
+        found_exit_roughly = False    
 
         print('Waiting for point cloud ...')
         self.robot.wait_for_point_cloud()
@@ -87,48 +86,57 @@ class Algorithm:
             mask = np.logical_and(mask, pc[:, :, 1] > -0.2)  # check obstacle
             data = np.sort(pc[:, :, 2][mask])
 
-            dist = None
             if data.size > 50:
                 dist = np.percentile(data, 10)
+            else:
+                self.robot.cmd_velocity(0, 0.1) # fallback if pointcloud data are horrible
+                continue
 
             current_odom = self.robot.get_odometry()
             if current_odom is None:
                 continue
             current_yaw = current_odom[2]
+            print(f"dist={dist:.2f}, yaw={current_yaw:.3f}")
 
-            # free space detected
-            if dist is not None and dist >= FREE_TH:
-                if not in_free_space:
-                    first_wall_end_yaw = current_yaw
-                    in_free_space = True
-                    print(f"First wall ended at yaw={first_wall_end_yaw:.2f}")
+            # [1] - find exit approximetly
+            if not found_exit_roughly:
+                self.robot.cmd_velocity(0, 0.6)
+                if dist >= FREE_TH + 0.05:
+                    print("Found the exit roughly")
+                    found_exit_roughly = True
+
+            # [2] - we dont even have the first angle
+            elif first_wall_end_yaw is None:
                 self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
-                continue
+                if dist <= FREE_TH:
+                    first_wall_end_yaw = current_yaw
+                    print(f"First wall found at yaw={first_wall_end_yaw:.2f}")
+                
 
-            # wall detected again after free space
-            if dist is not None and dist < WALL_TH:
-                if in_free_space:
+            # [2] - we have the first yaw, but not the second one
+            elif second_wall_yaw is None:
+                self.robot.cmd_velocity(0, -EXIT_ANGULAR_VELOCITY) # rotate counterclockwise
+                # Check that we turned far enough away from first edge               
+                if dist <= FREE_TH and abs(self._normalize_angle(first_wall_end_yaw - current_yaw)) > 0.25:
                     second_wall_yaw = current_yaw
-                    print(f"Second wall detected at yaw={second_wall_yaw:.2f}")
-                    self.robot.cmd_velocity(0, 0)
+                    print(f"Second wall found at yaw={second_wall_yaw:.2f}")
 
-                    mid_yaw = self._normalize_angle(
-                        first_wall_end_yaw +
-                        self._normalize_angle(second_wall_yaw - first_wall_end_yaw) / 2
-                    )
+            # [3] - we have both angles, rotate towards the exit
+            else:
+                mid_yaw = self._normalize_angle(
+                    (first_wall_end_yaw + second_wall_yaw) / 2 
+                )
 
-                    delta_to_mid = self._normalize_angle(mid_yaw - second_wall_yaw)
+                delta_to_mid = self._normalize_angle(mid_yaw - second_wall_yaw + 0.20) # To compensate for the fact that the camera does not head straight ahead 
 
-                    print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
+                print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
 
-                    if not self._rotate_towards_point(delta_to_mid):
-                        return False
+                if not self._rotate_towards_point(delta_to_mid):
+                    return False
 
-                    print("Exit found!")
-                    return True
+                print("Exit found!")
+                return True
 
-            # keep rotating
-            self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
         return False
 
     def drive_out_of_garage(self) -> None:
@@ -177,10 +185,10 @@ class Algorithm:
 
             image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
 
-            depth_vis = cv2.applyColorMap(
-                255 - image.astype(np.uint8),
-                cv2.COLORMAP_JET
-            )     # used only for visualization
+            # depth_vis = cv2.applyColorMap(
+            #     255 - image.astype(np.uint8),
+            #     cv2.COLORMAP_JET
+            # )     # used only for visualization
 
             linear = 0.0
             angular = 0.0
@@ -230,11 +238,11 @@ class Algorithm:
             print(f"linear={linear:.2f}, angular={angular:.2f}\n")
             self.robot.cmd_velocity(linear=linear, angular=angular)
 
-            combined = np.hstack((frame, depth_vis))
-            cv2.imshow("combined", combined)
-            cv2.waitKey(1)
+        #     combined = np.hstack((frame, depth_vis))
+        #     cv2.imshow("combined", combined)
+        #     cv2.waitKey(1)
 
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
 
     def drive_around_pylon(self) -> bool:
         """
@@ -361,7 +369,7 @@ class Algorithm:
             True if the rotation was successfully completed, False if interrupted
             (e.g., due to shutdown, stop flag, or missing odometry data).
         """
-        print(f"Rotaing towards point {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
+        print(f"Rotaing by {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
 
         self.robot.wait_for_odometry()
         start = self.robot.get_odometry()
@@ -388,7 +396,7 @@ class Algorithm:
 
             # slow down near the end of rotation
             angle_error = self._normalize_angle(target_delta_yaw - dyaw)
-            print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
+            # print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
 
             angular = KP_ANG * angle_error   # proportional gain
             angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # clamp
@@ -453,8 +461,8 @@ class Algorithm:
             # heading error
             angle_error = self._normalize_angle(desired_yaw - yaw)
 
-            print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
-                f"distance={distance:.2f}, angle_error={angle_error:.2f}")
+            # print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
+            #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")
 
             # stop condition
             if distance < DISTANCE_TOL:
