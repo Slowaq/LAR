@@ -4,14 +4,11 @@ import cv2
 import math
 
 EXIT_ANGULAR_VELOCITY = 0.3
-import numpy as np
-import cv2
-
-EXIT_ANGULAR_VELOCITY = 0.3
-
 DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
+ANGULAR_TO_THE_POINT_CLAMP = 0.5
+KP_ANG = 2.0   # proportional gain for heading correction
 
 
 class Algorithm:
@@ -26,13 +23,11 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        #self.exit_garage()
-        #self.approach_pylon()
-        #self.drive_around_pylon()
-        #self.return_to_garage()
-        cv2.waitKey(200)  # let it settle
-        origin = self.robot.get_odometry()
-        self._go_to_point_using_odometry(0, 0)
+        # self.exit_garage()
+        # self.approach_pylon()
+        self.drive_around_pylon()
+        # self.return_to_garage()
+
         if self.stop:
             print("Algorithm exited early")
         else:
@@ -45,7 +40,7 @@ class Algorithm:
         if self.find_exit():
             self.drive_out_of_garage()
         else:
-            print("Could not exit the garage!")
+            print("Could not find the garage exit!")
 
     def find_exit(self) -> bool:
         """
@@ -145,19 +140,16 @@ class Algorithm:
         start_time = cv2.getTickCount() / cv2.getTickFrequency()
 
         print("Driving out of garage")
-        while not self.robot.is_shutting_down() or not self.stop:
+        while not self.robot.is_shutting_down() and not self.stop:
             current_time = cv2.getTickCount() / cv2.getTickFrequency()
 
             if current_time - start_time >= duration:
                 break
 
-            if not self.stop:
-                self.robot.cmd_velocity(linear=speed, angular=0)
-            else:
-                self.robot.cmd_velocity(0, 0)
+            self.robot.cmd_velocity(linear=speed, angular=0)
 
         self.robot.cmd_velocity(0, 0)
-        print("Out of garage!")
+        
 
     def approach_pylon(self) -> None:
         """
@@ -181,7 +173,7 @@ class Algorithm:
 
         def drive_for(duration, linear, angular):
             start = cv2.getTickCount() / cv2.getTickFrequency()
-            while not self.robot.is_shutting_down() or self.stop:
+            while not self.robot.is_shutting_down() and not self.stop:
                 now = cv2.getTickCount() / cv2.getTickFrequency()
 
                 if now - start >= duration:
@@ -261,19 +253,28 @@ class Algorithm:
     
     def _rotate_towards_point(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
         """
-        Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
-        Method utilizes odometry to reliably turn the desired amount. 
+        Rotate the robot by a desired angular displacement using odometry feedback.
+
+        This method performs a closed-loop rotation based on the robot's current yaw.
+        A proportional controller is used to smoothly approach the target angle while
+        reducing speed near the goal. The rotation stops when the angular error is
+        within a small tolerance.
 
         Parameters
-        -------
-            target_delta_yaw: desired change in orintation ( yaw ), units = [rad], absolute value
+        ----------
+        target_delta_yaw : float
+            Desired change in orientation (yaw) in radians. Positive values correspond
+            to counterclockwise rotation, negative values to clockwise rotation.
 
-            angular_speed: angular velocity, units = [rad/s]
-                           positive -> counterclokwise
-                           negative -> clockwise
+        angular_speed : float, optional
+            Initial angular velocity in radians per second. This value is dynamically
+            adjusted by the proportional controller during execution.
+
         Returns
         -------
-            None
+        bool
+            True if the rotation was successfully completed, False if interrupted
+            (e.g., due to shutdown, stop flag, or missing odometry data).
         """
         print(f"Rotaing towards point {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
 
@@ -304,8 +305,8 @@ class Algorithm:
             angle_error = self._normalize_angle(target_delta_yaw - dyaw)
             print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
 
-            angular = 2.0 * angle_error   # proportional gain
-            angular = max(min(angular, 0.5), -0.5)  # clamp
+            angular = KP_ANG * angle_error   # proportional gain
+            angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # clamp
 
             self.robot.cmd_velocity(0, angular)
             angular_speed=angular
@@ -314,10 +315,33 @@ class Algorithm:
         return True
 
     def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = SPEED_TO_THE_POINT) -> bool:
-        print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
+        """
+        Drive the robot toward a target 2D point using odometry-based feedback control.
 
-        Kp_ang = 2.0   # proportional gain for heading correction
-        max_ang = 0.5  # angular velocity clamp
+        The robot continuously adjusts its heading using a proportional angular controller
+        to stay aligned with the target point while moving forward. If the heading error
+        becomes too large, the robot temporarily stops forward motion and rotates in place
+        to correct its orientation.
+
+        Parameters
+        ----------
+        dest_x : float
+            Target x-coordinate in the world frame.
+
+        dest_y : float
+            Target y-coordinate in the world frame.
+
+        speed : float, optional
+            Desired linear velocity in meters per second when the robot is sufficiently
+            aligned with the target direction.
+
+        Returns
+        -------
+        bool
+            True if the robot reaches the target within the specified distance tolerance,
+            False if interrupted (e.g., stop flag or shutdown signal).
+        """
+        print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
 
         while not self.robot.is_shutting_down():
             if self.stop:   
@@ -351,8 +375,8 @@ class Algorithm:
                 return True
 
             # proportional angular correction
-            angular = Kp_ang * angle_error
-            angular = max(min(angular, max_ang), -max_ang)  # Clamp
+            angular = KP_ANG * angle_error
+            angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # Clamp
 
             # optional: slow down when badly misaligned
             linear = speed
@@ -364,41 +388,63 @@ class Algorithm:
         return False
 
     def _go_to_point_using_odometry(self, dest_x: float, dest_y: float) -> bool:
+        """
+        Navigate the robot to a target 2D point using a two-phase odometry-based strategy.
+
+        The navigation consists of:
+        1. Rotating the robot to face the target point.
+        2. Driving toward the target while maintaining alignment.
+
+        This process relies entirely on odometry feedback and uses helper methods
+        for rotation and translation. The function exits early if any step fails
+        or if execution is interrupted.
+
+        Parameters
+        ----------
+        dest_x : float
+            Target x-coordinate in the world frame.
+
+        dest_y : float
+            Target y-coordinate in the world frame.
+
+        Returns
+        -------
+        bool
+            True if the robot successfully reaches the destination, False if any
+            step fails or the operation is interrupted.
+        """
         print(f"Driving to point: ({dest_x:.2f}, {dest_y:.2f})")
-
-        while not self.robot.is_shutting_down():
-            if self.stop:   
-                self.robot.cmd_velocity(0, 0)
-                return False
             
-            current_odom = self.robot.get_odometry()
-            if current_odom is None:
-                continue # potential problem, robot might stop for a moment
+        self.robot.wait_for_odometry()
+        current_odom = self.robot.get_odometry()
+        if current_odom is None:
+            print("Odometry is None")
+            return False # Shouldnt ever happen
 
-            current_x, current_y = current_odom[0], current_odom[1]
+        current_x, current_y = current_odom[0], current_odom[1]
 
-            current_yaw = current_odom[2]
+        current_yaw = current_odom[2]
 
-            # Calculate the required angle to face the destination
-            target_angle = math.atan2(dest_y - current_y, dest_x - current_x)
-            print(f"Target angle: {target_angle}")
+        # Calculate the required angle to face the destination
+        target_angle = math.atan2(dest_y - current_y, dest_x - current_x)
+        print(f"Target angle: {target_angle}")
 
-            delta_yaw = self._normalize_angle(target_angle - current_yaw)
+        delta_yaw = self._normalize_angle(target_angle - current_yaw)
 
-            # ROtate towards point
-            angular_speed = ANGULAR_TO_THE_POINT if delta_yaw > 0 else -ANGULAR_TO_THE_POINT            
-            if not self._rotate_towards_point(delta_yaw, angular_speed=angular_speed):
-                print("Rotating towards point failed.")
-                return False
-            else:
-                print("Successfully rotated towards point.")
-            
-            # Drive to the point
-            if not self._drive_to_the_point(dest_x, dest_y):
-                print("Driving towards point failed.")
-                return False
-            else:
-                print("Successfully drove towards point.")
+        # ROtate towards point
+        angular_speed = ANGULAR_TO_THE_POINT if delta_yaw > 0 else -ANGULAR_TO_THE_POINT            
+        if not self._rotate_towards_point(delta_yaw, angular_speed=angular_speed):
+            print("Rotating towards point failed.")
+            return False
+        else:
+            print("Successfully rotated towards point.")
+        
+        # Drive to the point
+        if not self._drive_to_the_point(dest_x, dest_y):
+            print("Driving towards point failed.")
+            return False
+        else:
+            print("Successfully drove towards point.")
 
-            print("Destination reached successfully!")
-            return True
+        print("Destination reached successfully!")
+        return True
