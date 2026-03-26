@@ -9,8 +9,8 @@ DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
 ANGULAR_TO_THE_POINT_CLAMP = 0.5
-MINIMAL_ANGULAR = 0.05
-KP_ANG = 2.0   # proportional gain for heading correction
+MINIMAL_ANGULAR = 0.10
+KP_ANG = 5.0   # proportional gain for heading correction
 
 
 class Algorithm:
