@@ -44,12 +44,11 @@ class Algorithm:
 
     def find_exit(self) -> bool:
         """
-        Rotate the robot until a free direction is detected.
+        Rotate robot to the center of the garage's exit using point cloud data.
 
         The function analyzes the depth point cloud and estimates the
-        distance to obstacles in front of the robot. If sufficient free
-        space (>= DISTANCE_DETECTION m) is detected, the robot stops rotating and the
-        function returns True.
+        distance to obstacles in front of the robot. Calculates the angle of the exit 
+        by detecting when the wall ends and when it appears again.
 
         Returns
         -------
@@ -58,15 +57,15 @@ class Algorithm:
             False if the ROS node shuts down before detection.
         """
 
-        DISTANCE_DETECTION = 0.6
-        exit_found = False        
+        FREE_TH = 0.65
+        WALL_TH = 0.55
+        first_wall_end_yaw = None
+        second_wall_yaw = None
+        in_free_space = False    
 
         print('Waiting for point cloud ...')
         self.robot.wait_for_point_cloud()
         print('First point cloud recieved ...')
-
-        # WINDOW = 'obstacles' # Name of the OpenCV display window used to visualize the processed point-cloud image
-        # cv2.namedWindow(WINDOW)
 
         print("Finding exit")
         while not self.robot.is_shutting_down():
@@ -81,49 +80,54 @@ class Algorithm:
                 print('No point cloud')
                 continue
 
-            # mask out floor points
-            mask = pc[:, :, 1] < 0.2
-
-            # mask point too far
-            mask = np.logical_and(mask, pc[:, :, 2] < 3.0)
-
-            #if np.count_nonzero(mask) <= 0:
-            #    print('All point are too far ...')
-            #    continue
-
-            # # empty image
-            # image = np.zeros(mask.shape)
-
-            # # assign depth i.e. distance to image
-            # image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
-            # im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
-            #                             cv2.COLORMAP_JET)
-
-            # # show image
-            # cv2.imshow(WINDOW, im_color)
-            # cv2.waitKey(1)
-
-            # check obstacle
-            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)
+            mask = pc[:, :, 1] < 0.2                         # mask out floor points
+            mask = np.logical_and(mask, pc[:, :, 2] < 3.0)   # mask point too far
+            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)  # check obstacle
             data = np.sort(pc[:, :, 2][mask])
 
+            dist = None
             if data.size > 50:
                 dist = np.percentile(data, 10)
-                if dist >= DISTANCE_DETECTION:
-                    exit_found = True
 
-            # exit found
-            if exit_found:
-                print("Exit found!")
-                self.robot.cmd_velocity(0, 0)
-                return True
+            current_odom = self.robot.get_odometry()
+            if current_odom is None:
+                continue
+            current_yaw = current_odom[2]
 
-            # rotate to find exit
-            else:
-                self.robot.cmd_velocity(linear=0, angular=EXIT_ANGULAR_VELOCITY)
+            # free space detected
+            if dist is not None and dist >= FREE_TH:
+                if not in_free_space:
+                    first_wall_end_yaw = current_yaw
+                    in_free_space = True
+                    print(f"First wall ended at yaw={first_wall_end_yaw:.2f}")
+                self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
+                continue
 
-        return exit_found
+            # wall detected again after free space
+            if dist is not None and dist < WALL_TH:
+                if in_free_space:
+                    second_wall_yaw = current_yaw
+                    print(f"Second wall detected at yaw={second_wall_yaw:.2f}")
+                    self.robot.cmd_velocity(0, 0)
 
+                    mid_yaw = self._normalize_angle(
+                        first_wall_end_yaw +
+                        self._normalize_angle(second_wall_yaw - first_wall_end_yaw) / 2
+                    )
+
+                    delta_to_mid = self._normalize_angle(mid_yaw - second_wall_yaw)
+
+                    print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
+
+                    if not self._rotate_towards_point(delta_to_mid):
+                        return False
+
+                    print("Exit found!")
+                    return True
+
+            # keep rotating
+            self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
+        return False
 
     def drive_out_of_garage(self) -> None:
         """
