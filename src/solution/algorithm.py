@@ -22,6 +22,7 @@ class Algorithm:
         This function defines the instruction pipeline for the robot, from starting the program
         to successfully parking in the garage.
         """
+        self.stop = False
         self.exit_garage()
         self.robot.reset_odometry()
         self.approach_pylon()
