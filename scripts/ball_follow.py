@@ -9,7 +9,7 @@ def main():
     turtle = Turtlebot(rgb=True, pc=True)
     turtle.wait_for_rgb_image()
 
-    RESPONSE = 0.002
+    RESPONSE = 0.003
     rate = Rate(10)
 
     cv2.namedWindow("camera")
@@ -17,22 +17,25 @@ def main():
 
     print("window created")
 
-    target_distance = 0.6  # 60 cm
+    target_distance = 0.8  # 80 cm
     stoping = False
 
 
     while not turtle.is_shutting_down() and not stoping:
-
-        print("doing")
         # --- RGB OBRAZ ---
+        turtle.wait_for_rgb_image()
         frame = turtle.get_rgb_image()
         if frame is None:
+            print("No RGB image - this should not happen")
             continue
 
-        # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
         # --- POINT CLOUD ---
+        turtle.wait_for_point_cloud()
         pc = turtle.get_point_cloud()
+        if pc is None:
+            print("Pointcloud is None - this should never happen")
+            continue
+
         image = np.zeros(pc.shape[:2])
 
         mask = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
@@ -43,53 +46,51 @@ def main():
             255 - image.astype(np.uint8),
             cv2.COLORMAP_JET
         )
-        
-        if pc is None:
-            continue
 
         linear = 0.0
         angular = 0.0
                 
         error, x, y, frame = find_pylon(frame)
                 
-        if error is not None:
-            angular = -RESPONSE * error
-            continue
-        else:
+        if error is None:
             angular = 0.3  # hľadanie objektu
+        else:
+            angular = -RESPONSE * error
+            
 
-                # --- ZÍSKANIE VZDIALENOSTI Z POINT CLOUDU ---
-                # ochrana proti indexu mimo rozsah
+        # --- ZÍSKANIE VZDIALENOSTI Z POINT CLOUDU ---
 
-        h, w, _ = pc.shape
-        # if y >= h or x >= w:
-        #     print("womething is fucvked up")
-        #     distance = None
-        # else:
-        distance = pc[y, x, 2]  # Z = vzdialenosť dopredu
-        print(f"Shape: {pc.shape}")  # (480, 640, 3)
+        if x is not None and y is not None: 
+            distance = pc[y, x, 2]  # Z = vzdialenosť dopredu, pc.shape = (480, 640, 3)
+        else:
+            distance = None
 
-
-                # ak máme validnú vzdialenosť
+        # ak máme validnú vzdialenosť
         if distance is not None:
-                    # riadenie dopredného pohybu
-            print(f"distance: {distance}, target_distace: {target_distance}")
+
+            # riadenie dopredného pohybu    
+            print(f"distance: {distance:.2f}, target_distace: {target_distance:.2f}")
             if distance > target_distance:
                 if abs(error) < 50:
+                    print("Going after target")
                     linear = 0.1    # jedem dopredu
                 else:
+                    print("Angular error is too large - turning on the spot")
                     linear = 0.0    # jenom otaceni
             else:
+                    print("Close enough to the target - stopping")
                     linear = 0.0  # zastav
-                    stoping = False
+                    stoping = True
 
                     # debug info
             cv2.putText(frame, f"dist: {distance:.2f} m",
                                 (x - 40, y - 20),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                                 (255,255,255), 1)
+            
+        # Nemame validni vzdalenost - tocime se na miste a hledame pylon
         else:
-            print(" distance is None")
+            print("Distance is None - searching for pylon")
 
         turtle.cmd_velocity(linear=linear, angular=angular)
 
@@ -135,8 +136,10 @@ def find_pylon(frame):
             cv2.line(frame_bgr, (center_x, 0),
                      (center_x, frame.shape[0]), (255,0,0), 2)
 
+            print(f"Found pylon: error={error:.2f}, x={x:.2f}, y={y:.2f}")
             return error, x, y, frame_bgr
 
+    print("Couldnt find pylon")
     return None, None, None, frame_bgr
 
 
