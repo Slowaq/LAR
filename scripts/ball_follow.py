@@ -10,30 +10,22 @@ def main():
     turtle.wait_for_rgb_image()
 
     RESPONSE = 0.003
-    rate = Rate(10)
 
-    cv2.namedWindow("camera")
-    cv2.namedWindow("depth")
-
-    print("window created")
-
-    target_distance = 0.8  # 80 cm
+    target_distance = 0.5  # 50 cm
     stoping = False
 
 
     while not turtle.is_shutting_down() and not stoping:
         # --- RGB OBRAZ ---
-        turtle.wait_for_rgb_image()
         frame = turtle.get_rgb_image()
         if frame is None:
-            print("No RGB image - this should not happen")
+            print("No RGB image")
             continue
 
         # --- POINT CLOUD ---
-        turtle.wait_for_point_cloud()
         pc = turtle.get_point_cloud()
         if pc is None:
-            print("Pointcloud is None - this should never happen")
+            print("Pointcloud is None")
             continue
 
         image = np.zeros(pc.shape[:2])
@@ -66,12 +58,11 @@ def main():
             distance = None
 
         # ak máme validnú vzdialenosť
-        if distance is not None:
-
+        if distance is not None and not np.isnan(distance):
             # riadenie dopredného pohybu    
             print(f"distance: {distance:.2f}, target_distace: {target_distance:.2f}")
             if distance > target_distance:
-                if abs(error) < 50:
+                if abs(error) < 100:
                     print("Going after target")
                     linear = 0.1    # jedem dopredu
                 else:
@@ -79,6 +70,7 @@ def main():
                     linear = 0.0    # jenom otaceni
             else:
                     print("Close enough to the target - stopping")
+                    print(type(distance))
                     linear = 0.0  # zastav
                     stoping = True
 
@@ -92,14 +84,12 @@ def main():
         else:
             print("Distance is None - searching for pylon")
 
+        print(f"linear={linear:.2f}, angular={angular:.2f}\n")
         turtle.cmd_velocity(linear=linear, angular=angular)
 
         combined = np.hstack((frame, depth_vis))
         cv2.imshow("combined", combined)
-
         cv2.waitKey(1)
-
-        rate.sleep()
 
     cv2.destroyAllWindows()
 
@@ -110,7 +100,7 @@ def find_pylon(frame):
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
     lower_green = np.array([35, 70, 70])
-    upper_green = np.array([85, 255, 255])
+    upper_green = np.array([90, 255, 255])
 
     mask = cv2.inRange(hsv, lower_green, upper_green)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
@@ -127,7 +117,7 @@ def find_pylon(frame):
             x, y = int(x), int(y)
 
             width = frame.shape[1]
-            center_x = width // 2
+            center_x = width // 2 + 50
             error = x - center_x
 
             # kreslenie
