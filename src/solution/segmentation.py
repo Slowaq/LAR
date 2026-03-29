@@ -6,7 +6,7 @@ def find_pylon(frame):
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
     lower_green = np.array([35, 70, 70])
-    upper_green = np.array([90, 255, 255])
+    upper_green = np.array([80, 255, 255])
 
     mask = cv2.inRange(hsv, lower_green, upper_green)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))

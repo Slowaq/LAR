@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import math
 
-EXIT_ANGULAR_VELOCITY = 0.2
+EXIT_ANGULAR_VELOCITY = 0.3
 DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
@@ -80,11 +80,20 @@ class Algorithm:
             if pc is None:
                 print('No point cloud')
                 continue
+            
+            y = pc[:, :, 1]
+            z = pc[:, :, 2]
 
-            mask = pc[:, :, 1] < 0.2                         # mask out floor points
-            mask = np.logical_and(mask, pc[:, :, 2] < 3.0)   # mask point too far
-            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)  # check obstacle
-            data = np.sort(pc[:, :, 2][mask])
+            y_safe = np.where(np.isfinite(y), y, np.inf)
+            z_safe = np.where(np.isfinite(z), z, np.inf)
+
+            mask = (
+                (y_safe < 0.2) &
+                (y_safe > -0.2) &
+                (z_safe < 3.0)
+            )
+
+            data = np.sort(z[mask])
 
             if data.size > 50:
                 dist = np.percentile(data, 10)
@@ -94,13 +103,14 @@ class Algorithm:
 
             current_odom = self.robot.get_odometry()
             if current_odom is None:
+                print("Odometry is None")
                 continue
             current_yaw = current_odom[2]
             print(f"dist={dist:.2f}, yaw={current_yaw:.3f}")
 
             # [1] - find exit approximetly
             if not found_exit_roughly:
-                self.robot.cmd_velocity(0, 0.6)
+                self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
                 if dist >= FREE_TH + 0.05:
                     print("Found the exit roughly")
                     found_exit_roughly = True
@@ -117,7 +127,7 @@ class Algorithm:
             elif second_wall_yaw is None:
                 self.robot.cmd_velocity(0, -EXIT_ANGULAR_VELOCITY) # rotate counterclockwise
                 # Check that we turned far enough away from first edge               
-                if dist <= FREE_TH and abs(self._normalize_angle(first_wall_end_yaw - current_yaw)) > 0.25:
+                if dist <= FREE_TH and abs(self._normalize_angle(first_wall_end_yaw - current_yaw)) > 0.75:
                     second_wall_yaw = current_yaw
                     print(f"Second wall found at yaw={second_wall_yaw:.2f}")
 
@@ -185,10 +195,10 @@ class Algorithm:
 
             image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
 
-            # depth_vis = cv2.applyColorMap(
-            #     255 - image.astype(np.uint8),
-            #     cv2.COLORMAP_JET
-            # )     # used only for visualization
+            depth_vis = cv2.applyColorMap(
+                255 - image.astype(np.uint8),
+                cv2.COLORMAP_JET
+            )     # used only for visualization
 
             linear = 0.0
             angular = 0.0
@@ -238,11 +248,11 @@ class Algorithm:
             print(f"linear={linear:.2f}, angular={angular:.2f}\n")
             self.robot.cmd_velocity(linear=linear, angular=angular)
 
-        #     combined = np.hstack((frame, depth_vis))
-        #     cv2.imshow("combined", combined)
-        #     cv2.waitKey(1)
+            combined = np.hstack((frame, depth_vis))
+            cv2.imshow("combined", combined)
+            cv2.waitKey(1)
 
-        # cv2.destroyAllWindows()
+        cv2.destroyAllWindows()
 
     def drive_around_pylon(self) -> bool:
         """
@@ -264,8 +274,8 @@ class Algorithm:
         # Rectangle in robot frame (forward = x, left = y)
         points_local = [
             (0.0,  0.33),
-            (0.75, 0.33),
-            (0.75, -0.33),
+            (0.65, 0.33),
+            (0.65, -0.33),
             (0.0, -0.33),
         ]
 
