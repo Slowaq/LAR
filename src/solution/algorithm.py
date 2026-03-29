@@ -9,7 +9,8 @@ DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
 ANGULAR_TO_THE_POINT_CLAMP = 0.5
-KP_ANG = 2.0   # proportional gain for heading correction
+MINIMAL_ANGULAR = 0.10
+KP_ANG = 5.0   # proportional gain for heading correction
 
 
 class Algorithm:
@@ -22,6 +23,7 @@ class Algorithm:
         This function defines the instruction pipeline for the robot, from starting the program
         to successfully parking in the garage.
         """
+        self.stop = False
         self.exit_garage()
         self.robot.reset_odometry()
         self.approach_pylon()
@@ -44,12 +46,11 @@ class Algorithm:
 
     def find_exit(self) -> bool:
         """
-        Rotate the robot until a free direction is detected.
+        Rotate robot to the center of the garage's exit using point cloud data.
 
         The function analyzes the depth point cloud and estimates the
-        distance to obstacles in front of the robot. If sufficient free
-        space (>= DISTANCE_DETECTION m) is detected, the robot stops rotating and the
-        function returns True.
+        distance to obstacles in front of the robot. Calculates the angle of the exit 
+        by detecting when the wall ends and when it appears again.
 
         Returns
         -------
@@ -58,15 +59,14 @@ class Algorithm:
             False if the ROS node shuts down before detection.
         """
 
-        DISTANCE_DETECTION = 0.6
-        exit_found = False        
+        FREE_TH = 0.50
+        first_wall_end_yaw = None
+        second_wall_yaw = None
+        found_exit_roughly = False    
 
         print('Waiting for point cloud ...')
         self.robot.wait_for_point_cloud()
         print('First point cloud recieved ...')
-
-        # WINDOW = 'obstacles' # Name of the OpenCV display window used to visualize the processed point-cloud image
-        # cv2.namedWindow(WINDOW)
 
         print("Finding exit")
         while not self.robot.is_shutting_down():
@@ -80,50 +80,74 @@ class Algorithm:
             if pc is None:
                 print('No point cloud')
                 continue
+            
+            y = pc[:, :, 1]
+            z = pc[:, :, 2]
 
-            # mask out floor points
-            mask = pc[:, :, 1] < 0.2
+            y_safe = np.where(np.isfinite(y), y, np.inf)
+            z_safe = np.where(np.isfinite(z), z, np.inf)
 
-            # mask point too far
-            mask = np.logical_and(mask, pc[:, :, 2] < 3.0)
+            mask = (
+                (y_safe < 0.2) &
+                (y_safe > -0.2) &
+                (z_safe < 3.0)
+            )
 
-            #if np.count_nonzero(mask) <= 0:
-            #    print('All point are too far ...')
-            #    continue
-
-            # # empty image
-            # image = np.zeros(mask.shape)
-
-            # # assign depth i.e. distance to image
-            # image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
-            # im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
-            #                             cv2.COLORMAP_JET)
-
-            # # show image
-            # cv2.imshow(WINDOW, im_color)
-            # cv2.waitKey(1)
-
-            # check obstacle
-            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)
-            data = np.sort(pc[:, :, 2][mask])
+            data = np.sort(z[mask])
 
             if data.size > 50:
                 dist = np.percentile(data, 10)
-                if dist >= DISTANCE_DETECTION:
-                    exit_found = True
+            else:
+                self.robot.cmd_velocity(0, 0.1) # fallback if pointcloud data are horrible
+                continue
 
-            # exit found
-            if exit_found:
+            current_odom = self.robot.get_odometry()
+            if current_odom is None:
+                print("Odometry is None")
+                continue
+            current_yaw = current_odom[2]
+            print(f"dist={dist:.2f}, yaw={current_yaw:.3f}")
+
+            # [1] - find exit approximetly
+            if not found_exit_roughly:
+                self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
+                if dist >= FREE_TH + 0.05:
+                    print("Found the exit roughly")
+                    found_exit_roughly = True
+
+            # [2] - we dont even have the first angle
+            elif first_wall_end_yaw is None:
+                self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
+                if dist <= FREE_TH:
+                    first_wall_end_yaw = current_yaw
+                    print(f"First wall found at yaw={first_wall_end_yaw:.2f}")
+                
+
+            # [2] - we have the first yaw, but not the second one
+            elif second_wall_yaw is None:
+                self.robot.cmd_velocity(0, -EXIT_ANGULAR_VELOCITY) # rotate counterclockwise
+                # Check that we turned far enough away from first edge               
+                if dist <= FREE_TH and abs(self._normalize_angle(first_wall_end_yaw - current_yaw)) > 0.75:
+                    second_wall_yaw = current_yaw
+                    print(f"Second wall found at yaw={second_wall_yaw:.2f}")
+
+            # [3] - we have both angles, rotate towards the exit
+            else:
+                mid_yaw = self._normalize_angle(
+                    (first_wall_end_yaw + second_wall_yaw) / 2 
+                )
+
+                delta_to_mid = self._normalize_angle(mid_yaw - second_wall_yaw + 0.20) # To compensate for the fact that the camera does not head straight ahead 
+
+                print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
+
+                if not self._rotate_towards_point(delta_to_mid):
+                    return False
+
                 print("Exit found!")
-                self.robot.cmd_velocity(0, 0)
                 return True
 
-            # rotate to find exit
-            else:
-                self.robot.cmd_velocity(linear=0, angular=EXIT_ANGULAR_VELOCITY)
-
-        return exit_found
-
+        return False
 
     def drive_out_of_garage(self) -> None:
         """
@@ -134,21 +158,10 @@ class Algorithm:
         -------
             None
         """
-        duration = 3.0      # seconds
-        speed = 0.2         # m/s
+        DISTANCE = 0.5 # 40 cm
 
-        start_time = cv2.getTickCount() / cv2.getTickFrequency()
-
-        print("Driving out of garage")
-        while not self.robot.is_shutting_down() and not self.stop:
-            current_time = cv2.getTickCount() / cv2.getTickFrequency()
-
-            if current_time - start_time >= duration:
-                break
-
-            self.robot.cmd_velocity(linear=speed, angular=0)
-
-        self.robot.cmd_velocity(0, 0)
+        self.robot.reset_odometry()
+        self._go_to_point_using_odometry(DISTANCE, 0)
         
 
     def approach_pylon(self) -> None:
@@ -255,19 +268,29 @@ class Algorithm:
         if start_odom is None:
             print("Odometry is None")
             return False
-        
-        start_x, start_y = start_odom[0], start_odom[1]
-        # drive in a rectangle around the pylon 
-        if not self._go_to_point_using_odometry(start_x, start_y + 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x + 0.65, start_y + 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x + 0.65, start_y - 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x, start_y - 0.33):
-            return False
-        if not self._go_to_point_using_odometry(start_x, start_y):
-            return False
+
+        start_x, start_y, start_phi = start_odom
+
+        # Rectangle in robot frame (forward = x, left = y)
+        points_local = [
+            (0.0,  0.33),
+            (0.65, 0.33),
+            (0.65, -0.33),
+            (0.0, -0.33),
+        ]
+
+        # Convert to global frame
+        points_global = []
+        for x, y in points_local:
+            x_transformed = start_x + x * math.cos(start_phi) - y * math.sin(start_phi)
+            y_transformed = start_y + x * math.sin(start_phi) + y * math.cos(start_phi)
+            points_global.append((x_transformed, y_transformed))
+
+        # Execute path
+        for x_transformed, y_transformed in points_global:
+            if not self._go_to_point_using_odometry(x_transformed, y_transformed):
+                return False
+
         return True
     
     def return_to_garage(self) -> None:
@@ -356,7 +379,7 @@ class Algorithm:
             True if the rotation was successfully completed, False if interrupted
             (e.g., due to shutdown, stop flag, or missing odometry data).
         """
-        print(f"Rotaing towards point {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
+        print(f"Rotaing by {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
 
         self.robot.wait_for_odometry()
         start = self.robot.get_odometry()
@@ -383,10 +406,12 @@ class Algorithm:
 
             # slow down near the end of rotation
             angle_error = self._normalize_angle(target_delta_yaw - dyaw)
-            print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
+            # print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
 
             angular = KP_ANG * angle_error   # proportional gain
             angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # clamp
+            if -MINIMAL_ANGULAR < angular < MINIMAL_ANGULAR:
+                angular = MINIMAL_ANGULAR if angular > 0 else -MINIMAL_ANGULAR
 
             self.robot.cmd_velocity(0, angular)
             angular_speed=angular
@@ -446,8 +471,8 @@ class Algorithm:
             # heading error
             angle_error = self._normalize_angle(desired_yaw - yaw)
 
-            print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
-                f"distance={distance:.2f}, angle_error={angle_error:.2f}")
+            # print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
+            #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")
 
             # stop condition
             if distance < DISTANCE_TOL:

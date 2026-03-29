@@ -11,14 +11,17 @@ WINDOW = 'obstacles'
 
 def main():
 
-    turtle = Turtlebot(pc=True)
+    turtle = Turtlebot(pc=True, rgb=True)
     cv2.namedWindow(WINDOW)
 
     while not turtle.is_shutting_down():
         # get point cloud
+        turtle.wait_for_point_cloud()
         pc = turtle.get_point_cloud()
+        turtle.wait_for_rgb_image()
+        rgb = turtle.get_rgb_image()    # shape (480, 640, 3)
 
-        if pc is None:
+        if pc is None or rgb is None:
             continue
 
         # mask out floor points
@@ -39,8 +42,14 @@ def main():
         im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
                                      cv2.COLORMAP_JET)
 
+        # OPTIONAL: ensure both images have same type
+        rgb_uint8 = rgb.astype(np.uint8)
+
+        # combine images side by side
+        combined = np.hstack((rgb_uint8, im_color))
+
         # show image
-        cv2.imshow(WINDOW, im_color)
+        cv2.imshow(WINDOW, combined)
         cv2.waitKey(1)
 
 
