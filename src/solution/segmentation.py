@@ -3,7 +3,7 @@ import cv2
 
 CIRCULARITY_THRESHOLD = 0.55
 
-def find_pylon(frame):
+def find_pylon(frame: np.ndarray):
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
@@ -87,6 +87,8 @@ def find_purple_quads(frame_bgr):
             centers.append((cx, cy))
         else:
             centers.append((int(rect[0][0]), int(rect[0][1])))  # fallback
+
+    centers.sort(key=lambda x: x[0])
 
     # Draw detected quads
     for poly, (cx, cy) in zip(detected, centers):
