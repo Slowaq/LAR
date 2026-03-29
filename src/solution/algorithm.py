@@ -11,6 +11,9 @@ ANGULAR_TO_THE_POINT = 0.7
 ANGULAR_TO_THE_POINT_CLAMP = 0.5
 MINIMAL_ANGULAR = 0.10
 KP_ANG = 5.0   # proportional gain for heading correction
+DISTANCE_OUT_OF_GARAGE = 0.5 # [cm] how far should the robot drive out ouf the garade in the exit_garage() method
+GARAGE_WALL_DISTANCE = 0.26 # [cm] distance from the wall when parking into garage
+
 
 
 class Algorithm:
@@ -148,10 +151,9 @@ class Algorithm:
         -------
             None
         """
-        DISTANCE = 0.5 # 40 cm
 
         self.robot.reset_odometry()
-        self._go_to_point_using_odometry(DISTANCE, 0)
+        self._go_to_point_using_odometry(DISTANCE_OUT_OF_GARAGE, 0)
         
 
     def approach_pylon(self) -> None:
@@ -249,7 +251,11 @@ class Algorithm:
         Hardcoded maneuver to drive around the pylon using odometry feedback. 
         The robot drives in a rectangle around the pylon and then returns to the starting point.
 
-        Starting point: 28cm in front of the pylon, centered. 
+        Starting point: 28cm in front of the pylon, centered.
+
+        Returns
+        -------
+            bool: True if successfully drove around the pylon, False if interrupted or failed. 
         """
         print("Driving around pylon using odometry")
 
@@ -287,8 +293,11 @@ class Algorithm:
         """
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
         """
-        self.approach_garage()
-        self.park_into_garage()
+        if not self.approach_garage():
+            print("Failed to approach garage")
+            return
+        if not self.drive_into_garage():
+            print("Failed to park into garage")
 
     def find_garage_entrance(self) -> None:
         """
@@ -303,11 +312,50 @@ class Algorithm:
         """
         self._go_to_point_using_odometry(0, 0)
 
-    def park_into_garage(self) -> None:
+    def drive_into_garage(self) -> bool:
         """
-        The robot is already in front of the garage door and now simply drives inside.
+        This method uses point cloud data to drive straight into the garage until it is close enough to the wall.
+        Neccesary condittion is that the robot is already in between garage pillars and facing the wall. 
+
+        Returns
+        -------
+            bool: True if successfully parked, False if interrupted or failed.
         """
-        pass
+        print(f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall.")
+
+        print('Waiting for point cloud ...')
+        self.robot.wait_for_point_cloud()
+        direction = None
+        print('First point cloud recieved ...')
+
+        while not self.robot.is_shutting_down() and not self.stop:
+            # get point cloud
+            pc = self.robot.get_point_cloud()
+
+            if pc is None:
+                print('No point cloud')
+                continue
+
+            mask = pc[:, :, 1] < 0.2                         # mask out floor points
+            mask = np.logical_and(mask, pc[:, :, 2] < 3.0)   # mask point too far
+            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)  # check obstacle
+            data = np.sort(pc[:, :, 2][mask])
+
+            if data.size > 50:
+                dist = np.percentile(data, 10)
+            else:
+                self.robot.cmd_velocity(0, 0.1) # fallback if pointcloud data are horrible
+                continue
+
+            print(f"dist={dist:.2f}")
+
+            if dist > GARAGE_WALL_DISTANCE:
+                self.robot.cmd_velocity(0.1, 0)
+            else:
+                self.robot.cmd_velocity(0, 0)
+                print("Parked into garage!")
+                return True
+        return False
 
     def _drive_forward(self) -> None:
         """
