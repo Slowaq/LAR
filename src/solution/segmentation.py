@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-CIRCULARITY_THRESHOLD = 0.7
+CIRCULARITY_THRESHOLD = 0.55
 
 def find_pylon(frame):
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
