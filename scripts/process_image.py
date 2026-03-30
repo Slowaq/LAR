@@ -3,8 +3,6 @@ import numpy as np
 import scipy.io
 import matplotlib.pyplot as plt
 
-from solution import rgb_to_hsv
-
 from sys import argv
 
 hues = []
