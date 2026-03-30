@@ -20,6 +20,7 @@ class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
+        self.trajectory = []   # Used for storing the trajectory of the robot for debugging purposes. Not used in the algorithm itself.
 
     def run(self) -> None:
         """
@@ -444,6 +445,7 @@ class Algorithm:
                 # Shouldnt ever happen
                 print("Odometry is None")
                 continue
+            self.trajectory.append((odom[0], odom[1]))
 
             dyaw = self._normalize_angle(odom[2] - start_yaw)
 
@@ -509,6 +511,7 @@ class Algorithm:
                 continue
 
             x, y, yaw = current
+            self.trajectory.append((x, y))
 
             # distance to goal
             distance = self._distance_from(current, [dest_x, dest_y])
