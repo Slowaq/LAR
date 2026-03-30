@@ -338,10 +338,11 @@ class Algorithm:
         """
         print(f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall.")
 
-        print('Waiting for point cloud and RGB...')
+        print('Waiting for point cloud, RGB and odometry...')
         self.robot.wait_for_point_cloud()
         self.robot.wait_for_rgb_image()
-        print('First point cloud and RGB recieved ...')
+        self.robot.wait_for_odometry()
+        print('First point cloud, RGB and odometry recieved recieved ...')
 
         # TODO: najit pilire, brat v potaz to, ze aby hloubka byla presna, tak musi robot
         # byt natocen k piliri primo. Pilir nesmi byt na okraji obrazovky - vznika chyba.
@@ -350,6 +351,8 @@ class Algorithm:
         while not self.robot.is_shutting_down() and not self.stop:
             rgb_image = self.robot.get_rgb_image()
             pc = self.robot.get_point_cloud()
+            odometry = self.robot.get_odometry()
+            current_yaw = odometry[2]
 
             centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
             if len(centers) != 2:
@@ -361,11 +364,13 @@ class Algorithm:
             left_center_delta_x = left_center_point[0]
             left_center_delta_z = left_center_point[2]
             left_center_delta_yaw = math.atan2(left_center_delta_x, left_center_delta_z)
+            left_center_tager_yaw = self._normalize_angle(current_yaw + left_center_delta_yaw)
             right_center = centers[1]
             right_center_point = pc[right_center[1], right_center[0], :]
             right_center_delta_x = right_center_point[0]
             right_center_delta_z = right_center_point[2]
             right_center_delta_yaw = math.atan2(right_center_delta_x, right_center_delta_z)
+            right_center_target_yaw = self._normalize_angle(current_yaw - right_center_delta_yaw)
 
             print(f"left delta yaw={left_center_delta_yaw:.2f}, right_center_delta_yaw={right_center_delta_yaw:.2f}")
 
