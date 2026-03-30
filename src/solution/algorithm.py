@@ -1,6 +1,6 @@
 from robolab_turtlebot import Turtlebot
 from .segmentation import find_pylon, find_purple_quads
-from .math_utils import normalize_angle, get_distance
+from .math_utils import normalize_angle, get_distance, get_average_of_nearby_pixels, rotate_vector, average_vector
 import numpy as np
 import cv2
 import math
@@ -33,10 +33,10 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        self.exit_garage()
-        self.robot.reset_odometry()
-        self.approach_pylon()
-        self.drive_around_pylon()
+        # self.exit_garage()
+        # self.robot.reset_odometry()
+        # self.approach_pylon()
+        # self.drive_around_pylon()
         self.return_to_garage()
 
         if self.stop:
@@ -308,9 +308,9 @@ class Algorithm:
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
         """
         print("returning to garage")
-        if not self.approach_garage():
-            print("Failed to approach garage")
-            return
+        # if not self.approach_garage():
+        #     print("Failed to approach garage")
+        #     return
         if not self.drive_into_garage():
             print("Failed to park into garage")
 
@@ -325,11 +325,10 @@ class Algorithm:
         The robot drives in front of the garage door. After this function, it should be enough
         to drive straight into the garage.
         """
-        self._go_to_point_using_odometry(0.3, 0)
+        if not self._go_to_point_using_odometry(0.3, 0):
+            return False
         self.robot.wait_for_odometry()
-        current_yaw = self.robot.get_odometry()[2]
-        self._rotate_by_angle(math.pi - current_yaw)
-        return True
+        return self._rotate_to_angle(math.pi)
 
     def drive_into_garage(self) -> bool:
         """
@@ -344,7 +343,6 @@ class Algorithm:
 
         print('Waiting for point cloud, RGB and odometry...')
         self.robot.wait_for_point_cloud()
-
         self.robot.wait_for_rgb_image()
         self.robot.wait_for_odometry()
         print('First point cloud, RGB and odometry recieved recieved ...')
@@ -353,6 +351,9 @@ class Algorithm:
         # byt natocen k piliri primo. Pilir nesmi byt na okraji obrazovky - vznika chyba.
         # Podle piliru dopocitat bod, na ose mezi piliri pred garazi a dojet tam a natocit se presne do garaze 
 
+        left_center_target_yaw, right_center_target_yaw = None, None
+
+        # [1] Find the two purple pillars
         while not self.robot.is_shutting_down() and not self.stop:
             rgb_image = self.robot.get_rgb_image()
             pc = self.robot.get_point_cloud()
@@ -364,22 +365,29 @@ class Algorithm:
                 # self.robot.cmd_velocity(0, 0.4)
                 continue
 
-            left_center = centers[0]
-            left_center_point = pc[left_center[1], left_center[0], :]
+            left_center = centers[0] # (y, x)
+            left_center_point = get_average_of_nearby_pixels(pc, left_center[1], left_center[0])
+            if left_center_point is None:
+                print("Couldnt read pointcloud of left pillar center point")
+                return False
             left_center_delta_x = left_center_point[0]
             left_center_delta_z = left_center_point[2]
             left_center_delta_yaw = math.atan2(left_center_delta_x, left_center_delta_z)
-            left_center_tager_yaw = self._normalize_angle(current_yaw + left_center_delta_yaw)
+            left_center_target_yaw = normalize_angle(current_yaw - left_center_delta_yaw)
             right_center = centers[1]
-            right_center_point = pc[right_center[1], right_center[0], :]
+            right_center_point = get_average_of_nearby_pixels(pc,right_center[1], right_center[0])
+            if right_center_point is None:
+                print("Couldnt read pointcloud of right pillar center point")
+                return False
             right_center_delta_x = right_center_point[0]
             right_center_delta_z = right_center_point[2]
             right_center_delta_yaw = math.atan2(right_center_delta_x, right_center_delta_z)
-            right_center_target_yaw = self._normalize_angle(current_yaw - right_center_delta_yaw)
+            right_center_target_yaw = normalize_angle(current_yaw - right_center_delta_yaw)
+            print(f"left_delta={left_center_delta_yaw:.2f}, right_delta={right_center_delta_yaw:.2f}, current={current_yaw:.2f}, left={left_center_target_yaw:.2f}, right={right_center_target_yaw:.2f}")
+            break
+    
 
-            print(f"left delta yaw={left_center_delta_yaw:.2f}, right_center_delta_yaw={right_center_delta_yaw:.2f}")
-
-            # --- DEPTH VISUALIZATION ---
+            # --- DEPTH VISUALIZATION ---   # TODO remove ts - debugging visualisation only
             image = np.zeros(pc.shape[:2])
 
             mask_depth = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
@@ -415,7 +423,99 @@ class Algorithm:
             if key == 27:  # ESC to exit
                 break
 
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
+
+        # [2] look at the left pillar directly to get the most accurate depth approximation
+        if not self._rotate_to_angle(left_center_target_yaw):
+            return False
+        
+        self.robot.wait_for_point_cloud()
+        self.robot.wait_for_rgb_image()
+        self.robot.wait_for_odometry()
+        left_actual_yaw = self.robot.get_odometry()[2]
+        rgb_image = self.robot.get_rgb_image()
+        pc = self.robot.get_point_cloud()
+        centers, _, _ = find_purple_quads(rgb_image)
+        if not centers:
+            print("Robot does not see left pillar")
+            return False
+        # get the center closest to center
+        centers.sort(key=lambda x: abs(x[1] - 320))
+        y, x = centers[0][1], centers[0][0]
+        left_pillar = get_average_of_nearby_pixels(pc, y, x)
+        if left_pillar is None:
+            print("Could not read left pillar")
+        else:
+            vis = rgb_image.copy()
+
+            # draw point
+            cv2.circle(vis, (x, y), 6, (0, 255, 0), -1)
+
+            # format text
+            text = f"L: ({left_pillar[0]:.2f}, {left_pillar[1]:.2f}, {left_pillar[2]:.2f})"
+
+            # draw text near the point
+            cv2.putText(vis, text, (x + 10, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            while True:
+                cv2.imshow("Left Pillar", vis)
+                key = cv2.waitKey(1) 
+                if key == 27:
+                    cv2.destroyAllWindows()
+                    break
+
+        # [3] look at the right pillar directly to get the most accurate depth approximation
+        if not self._rotate_to_angle(right_center_target_yaw):
+            return False
+        
+        self.robot.wait_for_point_cloud()
+        self.robot.wait_for_rgb_image()
+        self.robot.wait_for_odometry()
+        right_actual_yaw = self.robot.get_odometry()[2]
+        rgb_image = self.robot.get_rgb_image()
+        pc = self.robot.get_point_cloud()
+        centers, _, _ = find_purple_quads(rgb_image)
+        if not centers:
+            print("Robot does not see right pillar")
+            return False
+        # get the center closest to center
+        centers.sort(key=lambda x: abs(x[1] - 320))
+        y, x = centers[0][1], centers[0][0]
+        right_pillar = get_average_of_nearby_pixels(pc, y, x)
+        if right_pillar is None:
+            print("Could not read right pillar")
+        else:
+            vis = rgb_image.copy()
+
+            # draw point
+            cv2.circle(vis, (x, y), 6, (0, 0, 255), -1)
+
+            # format text
+            text = f"R: ({right_pillar[0]:.2f}, {right_pillar[1]:.2f}, {right_pillar[2]:.2f})"
+
+            # draw text near the point
+            cv2.putText(vis, text, (x + 10, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+            while True:
+                cv2.imshow("Right Pillar", vis)
+                key = cv2.waitKey(1) 
+                if key == 27:
+                    cv2.destroyAllWindows()
+                    break
+
+        # [4] get garage midpoint (everything is relative to robot
+        left = (left_pillar[0], left_pillar[2]) # (x,y), where x is right of robot and y is in front of robot
+        print(f"left pillar originaly: {left}")
+        right = (right_pillar[0], right_pillar[2])
+        print(f"right pillar: {right}")
+        phi = normalize_angle(left_actual_yaw - right_actual_yaw)
+        left = rotate_vector(*left, phi)  
+        print(f"left yaw: {left_actual_yaw:.2f}, right yaw: {right_actual_yaw:.2f}")
+        print(f"left pillar after rotation by {phi:.2f}: {left}")
+        garage_gate = average_vector(left, right)
+        print(f"garage_gate: {garage_gate}")
 
         # Predpokladame, ze robot stoji na ose mezi fialovymi piliri
 
@@ -463,7 +563,7 @@ class Algorithm:
             desired_yaw = math.atan2(dest_y - y, dest_x - x)
 
             # heading error
-            angle_error = self._normalize_angle(desired_yaw - yaw)
+            angle_error = normalize_angle(desired_yaw - yaw)
 
             # print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
             #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")    
@@ -557,7 +657,7 @@ class Algorithm:
         self.robot.cmd_velocity(0, 0)
         return True
     
-    def rotate_to_angle(self, target_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
+    def _rotate_to_angle(self, target_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
         """
         Rotate the robot to an absolute yaw angle using odometry.
 
