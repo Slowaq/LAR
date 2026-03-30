@@ -12,6 +12,7 @@ BUTTON_B0 = 0
 BUTTON_B1 = 1
 BUTTON_B2 = 2
 
+# TODO - use proper class msg class instead of a mock
 @dataclass
 class BumperMsgMock:
     """
