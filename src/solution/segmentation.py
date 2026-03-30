@@ -3,7 +3,7 @@ import cv2
 
 CIRCULARITY_THRESHOLD = 0.55
 
-def find_pylon(frame):
+def find_pylon(frame: np.ndarray):
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
@@ -49,3 +49,50 @@ def find_pylon(frame):
 
     print("Couldnt find pylon")
     return None, None, None, frame_bgr
+
+def find_purple_quads(frame_bgr):
+    hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+
+    lower_purple = np.array([111, 80, 60])
+    upper_purple = np.array([145, 255, 255])
+
+    mask = cv2.inRange(hsv, lower_purple, upper_purple)
+
+    # Clean mask
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((10, 10), np.uint8))
+    frame_bw = mask.copy()
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    detected = []
+    centers = []
+
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area < 300:
+            continue
+
+        # Compute 4-point bounding box
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        detected.append(box)
+
+        # Compute center using moments of the original contour
+        M = cv2.moments(cnt)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            centers.append((cx, cy))
+        else:
+            centers.append((int(rect[0][0]), int(rect[0][1])))  # fallback
+
+    centers.sort(key=lambda x: x[0])
+
+    # Draw detected quads
+    for poly, (cx, cy) in zip(detected, centers):
+        cv2.drawContours(frame_bgr, [poly], -1, (0, 255, 0), 2)
+        cv2.circle(frame_bgr, (cx, cy), 4, (0, 0, 255), -1)
+
+    return centers, frame_bgr, frame_bw

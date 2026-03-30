@@ -33,10 +33,10 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        self.exit_garage()
-        self.robot.reset_odometry()
-        self.approach_pylon()
-        self.drive_around_pylon()
+        # self.exit_garage()
+        # self.robot.reset_odometry()
+        # self.approach_pylon()
+        # self.drive_around_pylon()
         self.return_to_garage()
 
         if self.stop:
@@ -179,6 +179,11 @@ class Algorithm:
         self.robot.wait_for_rgb_image()
 
         target_distance = 0.5  # 50 cm
+=======
+        RESPONSE = 0.003
+
+        TARGET_DISTANCE = 0.6  # 50 cm
+>>>>>>> return_to_garage
         stoping = False
 
 
