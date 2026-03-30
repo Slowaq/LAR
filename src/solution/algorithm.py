@@ -1,5 +1,6 @@
 from robolab_turtlebot import Turtlebot
 from .segmentation import find_pylon, find_garage_purple_shits # TODO
+from .math_utils import normalize_angle, distance
 import numpy as np
 import cv2
 import math
@@ -130,17 +131,17 @@ class Algorithm:
             elif second_wall_yaw is None:
                 self.robot.cmd_velocity(0, -EXIT_ANGULAR_VELOCITY) # rotate counterclockwise
                 # Check that we turned far enough away from first edge               
-                if dist <= FREE_TH and abs(self._normalize_angle(first_wall_end_yaw - current_yaw)) > 0.75:
+                if dist <= FREE_TH and abs(normalize_angle(first_wall_end_yaw - current_yaw)) > 0.75:
                     second_wall_yaw = current_yaw
                     print(f"Second wall found at yaw={second_wall_yaw:.2f}")
 
             # [3] - we have both angles, rotate towards the exit
             else:
-                mid_yaw = self._normalize_angle(
+                mid_yaw = normalize_angle(
                     (first_wall_end_yaw + second_wall_yaw) / 2 
                 )
 
-                delta_to_mid = self._normalize_angle(mid_yaw - second_wall_yaw + 0.20) # To compensate for the fact that the camera does not head straight ahead 
+                delta_to_mid = normalize_angle(mid_yaw - second_wall_yaw + 0.20) # To compensate for the fact that the camera does not head straight ahead 
 
                 print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
 
@@ -373,34 +374,6 @@ class Algorithm:
         """
         pass
 
-    def _distance_from(self, point1: list, point2: list) -> float:
-        """
-        Helper method used for calculating distance of two 2D points.
-
-        Parameters
-        -------
-            point1: 2D point with coords [x,y]
-
-            point2: 2D point with coords [x,y]
-
-        Returns
-        -------
-            flaot: square root of distance of point1 and point2
-        """
-
-        dx = point1[0] - point2[0]
-        dy = point1[1] - point2[1]
-        return math.hypot(dx,dy)
-
-    def _normalize_angle(self, angle: float) -> float:
-        """
-        Helper method used for ensuring engle is in range (-pi,pi]
-
-        Returns
-        -------
-            float: normalized angle in range (-pi,pi]
-        """
-        return (angle + math.pi) % (2 * math.pi) - math.pi
     
     def _rotate_towards_point(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
         """
@@ -445,15 +418,15 @@ class Algorithm:
                 print("Odometry is None")
                 continue
 
-            dyaw = self._normalize_angle(odom[2] - start_yaw)
+            dyaw = normalize_angle(odom[2] - start_yaw)
 
-            angle_error = self._normalize_angle(target_delta_yaw - dyaw)
+            angle_error = normalize_angle(target_delta_yaw - dyaw)
 
             if abs(angle_error) < 0.05:  # ~3 degree tolerance
                 break
 
             # slow down near the end of rotation
-            angle_error = self._normalize_angle(target_delta_yaw - dyaw)
+            angle_error = normalize_angle(target_delta_yaw - dyaw)
             # print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
 
             angular = KP_ANG * angle_error   # proportional gain
@@ -511,13 +484,13 @@ class Algorithm:
             x, y, yaw = current
 
             # distance to goal
-            distance = self._distance_from(current, [dest_x, dest_y])
+            distance = distance(current, [dest_x, dest_y])
 
             # desired heading
             desired_yaw = math.atan2(dest_y - y, dest_x - x)
 
             # heading error
-            angle_error = self._normalize_angle(desired_yaw - yaw)
+            angle_error = normalize_angle(desired_yaw - yaw)
 
             # print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
             #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")
@@ -582,7 +555,7 @@ class Algorithm:
         target_angle = math.atan2(dest_y - current_y, dest_x - current_x)
         print(f"Target angle: {target_angle}")
 
-        delta_yaw = self._normalize_angle(target_angle - current_yaw)
+        delta_yaw = normalize_angle(target_angle - current_yaw)
 
         # ROtate towards point
         angular_speed = ANGULAR_TO_THE_POINT if delta_yaw > 0 else -ANGULAR_TO_THE_POINT            
