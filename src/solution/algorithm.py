@@ -11,7 +11,7 @@ SPEED_TO_THE_POINT = 0.3
 ANGULAR_TO_THE_POINT = 0.7
 ANGULAR_TO_THE_POINT_CLAMP = 0.5
 MINIMAL_ANGULAR_VELOCITY = 0.10
-KP_ANG = 5.0   # proportional gain for heading correction, proportional to angle error in radians
+KP_ANG = 2.0   # proportional gain for heading correction, proportional to angle error in radians
 KP_ANG_PIXELS = 0.003 # proportional gain for heading correction, proportional to angle error pixels
 DISTANCE_OUT_OF_GARAGE = 0.5 # [m] how far should the robot drive out ouf the garade in the exit_garage() method
 GARAGE_WALL_DISTANCE = 0.26 # [m] distance from the wall when parking into garage
@@ -25,6 +25,7 @@ class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
+        self.record_trajectory : bool = False   # If true, the robot's trajectory will be stored in self.trajectory 
         self.trajectory = []   # Used for storing the trajectory of the robot for debugging purposes. Not used in the algorithm itself.
 
     def run(self) -> None:
@@ -533,7 +534,8 @@ class Algorithm:
                 # Shouldnt ever happen
                 print("Odometry is None")
                 continue
-            self.trajectory.append((odom[0], odom[1]))
+            if self.record_trajectory:
+                self.trajectory.append((odom[0], odom[1]))
 
             dyaw = normalize_angle(odom[2] - start_yaw)
 
@@ -599,7 +601,8 @@ class Algorithm:
                 continue
 
             x, y, yaw = current
-            self.trajectory.append((x, y))
+            if self.record_trajectory:
+                self.trajectory.append((x, y))
 
             # distance to goal
             distance = get_distance(current, [dest_x, dest_y])
