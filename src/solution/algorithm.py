@@ -347,55 +347,65 @@ class Algorithm:
         # byt natocen k piliri primo. Pilir nesmi byt na okraji obrazovky - vznika chyba.
         # Podle piliru dopocitat bod, na ose mezi piliri pred garazi a dojet tam a natocit se presne do garaze 
 
-        # while not self.robot.is_shutting_down() and not self.stop:
-        #     rgb_image = self.robot.get_rgb_image()
-        #     pc = self.robot.get_point_cloud()
+        while not self.robot.is_shutting_down() and not self.stop:
+            rgb_image = self.robot.get_rgb_image()
+            pc = self.robot.get_point_cloud()
 
-        #     centers, frame_brg, frame_bw = find_purple_quads(rgb_image)
-        #     # if len(centers) != 2:
-        #     #     # self.robot.cmd_velocity(0, 0.4)
-        #     #     continue
+            centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
+            if len(centers) != 2:
+                # self.robot.cmd_velocity(0, 0.4)
+                continue
 
-        #     # --- DEPTH VISUALIZATION ---
-        #     image = np.zeros(pc.shape[:2])
+            left_center = centers[0]
+            left_center_point = pc[left_center[1], left_center[0], :]
+            left_center_delta_x = left_center_point[0]
+            left_center_delta_z = left_center_point[2]
+            left_center_delta_yaw = math.atan2(left_center_delta_x, left_center_delta_z)
+            right_center = centers[1]
+            right_center_point = pc[right_center[1], right_center[0], :]
+            right_center_delta_x = right_center_point[0]
+            right_center_delta_z = right_center_point[2]
+            right_center_delta_yaw = math.atan2(right_center_delta_x, right_center_delta_z)
 
-        #     mask_depth = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
-        #     image[mask_depth] = np.int8(pc[:, :, 2][mask_depth] / 3.0 * 255)
+            print(f"left delta yaw={left_center_delta_yaw:.2f}, right_center_delta_yaw={right_center_delta_yaw:.2f}")
 
-        #     depth_vis = cv2.applyColorMap(
-        #         255 - image.astype(np.uint8),
-        #         cv2.COLORMAP_JET
-        #     )
+            # --- DEPTH VISUALIZATION ---
+            image = np.zeros(pc.shape[:2])
 
-        #     # --- PURPLE DETECTION ---
-        #     centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
-        #     # print(centers)
+            mask_depth = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
+            image[mask_depth] = np.int8(pc[:, :, 2][mask_depth] / 3.0 * 255)
 
-        #     for (x, y) in centers:
-        #         if 0 <= y < pc.shape[0] and 0 <= x < pc.shape[1]:
-        #             distance = pc[y, x, 2]
-        #             if not np.isnan(distance):
-        #                 cv2.putText(annotated_bgr,
-        #                             f"{distance:.2f} m",
-        #                             (x - 40, y - 20),
-        #                             cv2.FONT_HERSHEY_SIMPLEX,
-        #                             0.5,
-        #                             (255, 255, 255),
-        #                             1)
+            depth_vis = cv2.applyColorMap(
+                255 - image.astype(np.uint8),
+                cv2.COLORMAP_JET
+            )   
 
-        #     # Convert BW mask to 3 channels for visualization
-        #     mask_vis = cv2.cvtColor(frame_bw, cv2.COLOR_GRAY2BGR)
 
-        #     # Combine annotated RGB, depth, and mask
-        #     combined = np.hstack((annotated_bgr, depth_vis, mask_vis))
-        #     display_img = combined.copy()
+            for (x, y) in centers:
+                if 0 <= y < pc.shape[0] and 0 <= x < pc.shape[1]:
+                    distance = pc[y, x, 2]
+                    if not np.isnan(distance):
+                        cv2.putText(annotated_bgr,
+                                    f"{distance:.2f} m, x={x:.2f},y={y:.2f}\npc={pc[y,x,:]}",
+                                    (x - 40, y - 20),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5,
+                                    (255, 255, 255),
+                                    1)
 
-        #     cv2.imshow("RGB + Depth (DEBUG)", display_img)
-        #     key = cv2.waitKey(1)
-        #     if key == 27:  # ESC to exit
-        #         break
+            # Convert BW mask to 3 channels for visualization
+            mask_vis = cv2.cvtColor(frame_bw, cv2.COLOR_GRAY2BGR)
 
-        # cv2.destroyAllWindows()
+            # Combine annotated RGB, depth, and mask
+            combined = np.hstack((annotated_bgr, depth_vis, mask_vis))
+            display_img = combined.copy()
+
+            cv2.imshow("RGB + Depth (DEBUG)", display_img)
+            key = cv2.waitKey(1)
+            if key == 27:  # ESC to exit
+                break
+
+        cv2.destroyAllWindows()
 
         # Predpokladame, ze robot stoji na ose mezi fialovymi piliri
 
