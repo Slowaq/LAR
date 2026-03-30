@@ -1,6 +1,6 @@
 import math
 
-def distance(point1: list[int, int], point2: list[int, int]) -> float:
+def get_distance(point1: list, point2: list) -> float:
     """
     Calculate distance from two 2D points.
 
