@@ -1,5 +1,5 @@
 from robolab_turtlebot import Turtlebot
-from .segmentation import *
+from .segmentation import find_pylon, find_garage_purple_shits # TODO
 import numpy as np
 import cv2
 import math

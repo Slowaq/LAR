@@ -4,7 +4,7 @@ import scipy.io
 import matplotlib.pyplot as plt
 from time import sleep
 
-from src.solution import *
+from src.solution import Algorithm, register_callbacks
 
 from sys import argv
 
