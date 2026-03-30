@@ -1,29 +1,40 @@
 import sys
 import os
 import math
+import time
+import signal
 import matplotlib.pyplot as plt
 import cv2
+import json
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.solution.algorithm import Algorithm
 
+# ===== GLOBAL (for safe shutdown) =====
+algo = None
 
-def dist(p1, p2):
-    return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+def signal_handler(sig, frame):
+    global algo
+    print("\nCtrl+C detected, stopping robot and exiting...")
 
-def wait_for_b1(robot):
-    print("Press B1 to start the test")
-    while not robot.is_shutting_down():
-        if robot.get_button("B1"):  
-            while robot.get_button("B1"): 
-                pass
-            return
+    if algo is not None:
+        try:
+            algo.robot.cmd_velocity(0, 0)
+        except:
+            pass
+
+    cv2.destroyAllWindows()
+    sys.exit(0)
+
+# register Ctrl+C handler
+signal.signal(signal.SIGINT, signal_handler)
 
 def main():
+    global algo
     algo = Algorithm()
 
-    wait_for_b1(algo.robot)
+    print("Starting fixed-rectangle odometry test... (Ctrl+C to stop)")
 
     algo.robot.reset_odometry()
     algo.robot.wait_for_odometry()
@@ -34,57 +45,86 @@ def main():
         print("Odometry is None")
         return
 
-    sx, sy, _ = start
-    target = (sx + 0.5, sy + 0.5)   # 1 m forward from start
+    sx, sy, sphi = start
+
+    # ===== RECTANGLE DEFINITION (GLOBAL FRAME) =====
+    width = 1
+    height = 1
+
+    rectangle_points = [
+        (sx + width, sy),
+        (sx + width, sy + height),
+        (sx, sy + height),
+        (sx, sy),
+    ]
+
+    N = 15  # number of repetitions
 
     all_paths = []
-    final_points = []
-    errors = []
-
-    N = 5  # number of repeated trials
 
     for i in range(N):
-        print(f"\nTrial {i + 1}/{N}")
+        print(f"\n=== Rectangle run {i + 1}/{N} ===")
 
-        algo.trajectory = [(sx, sy)]
-
-        ok = algo._go_to_point_using_odometry(target[0], target[1])
         current = algo.robot.get_odometry()
         if current is None:
-            print("Odometry is None after motion")
+            print("Odometry is None")
             break
+
+        algo.trajectory = [(current[0], current[1])]
+
+        for (px, py) in rectangle_points:
+            print(f"Going to ({px:.2f}, {py:.2f})")
+
+            ok = algo._go_to_point_using_odometry(px, py)
+            if not ok:
+                print("Movement failed")
+                break
+
+            time.sleep(0.05)  # helps Ctrl+C responsiveness
 
         path = algo.trajectory.copy()
         all_paths.append(path)
 
-        end_point = (current[0], current[1])
-        final_points.append(end_point)
-        error = dist(end_point, target)
-        errors.append(error)
+    # ===== SAVE TRAJECTORIES TO FILE =====
+    save_file = "trajectories.json"
+    with open(save_file, "w") as f:
+        json.dump(all_paths, f)
+    print(f"All trajectories saved to {save_file}")
 
-        print(f"Reached: {ok}, end error = {error:.3f} m")
+    # ===== STOP ROBOT AFTER FINISH =====
+    try:
+        algo.robot.cmd_velocity(0, 0)
+    except:
+        pass
 
+    # ===== PLOTTING =====
     plt.figure()
+
+    # plot all trajectories with a single legend entry
     for path in all_paths:
         xs = [p[0] for p in path]
         ys = [p[1] for p in path]
-        plt.plot(xs, ys, marker="r-")
+        plt.plot(xs, ys, color='b', label="Trajectory")
+    # prevent duplicate legend entries
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
 
-    plt.scatter([sx], [sy], label="start")
-    plt.scatter([target[0]], [target[1]], label="target")
-    if final_points:
-        fx = [p[0] for p in final_points]
-        fy = [p[1] for p in final_points]
-        plt.scatter(fx, fy, label="final points")
+    # reference rectangle (dashed)
+    rx = [p[0] for p in rectangle_points] + [rectangle_points[0][0]]
+    ry = [p[1] for p in rectangle_points] + [rectangle_points[0][1]]
+    plt.plot(rx, ry, 'k--', label="Reference Square")
+    plt.legend(by_label.values(), by_label.keys())
+
+    # start point
+    plt.scatter([sx], [sy], c='r', label="Start")
 
     plt.axis("equal")
     plt.grid(True)
-    plt.legend()
-    plt.show()
 
-    if errors:
-        print(f"\nMean final error: {sum(errors) / len(errors):.3f} m")
-        print(f"Max final error:  {max(errors):.3f} m")
+    # non-blocking show (so Ctrl+C still works)
+    plt.show()  # blocking=True by default
+    input("Press ENTER to exit...")
+    plt.close()
 
 
 if __name__ == "__main__":
