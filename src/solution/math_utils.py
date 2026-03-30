@@ -21,10 +21,10 @@ def get_distance(point1: list, point2: list) -> float:
 
 def normalize_angle(angle: float) -> float:
     """
-    Normalizes angle to (-pi, pi].
+    Normalizes angle to [-pi, pi).
 
     Returns
     -------
-        float: normalized angle in range (-pi,pi]
+        float: normalized angle in range [-pi,pi)
     """
     return (angle + math.pi) % (2 * math.pi) - math.pi

@@ -25,7 +25,7 @@ class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
-        self.trajectory = []   # Used for storing the trajectory of the robot for debugging purposes. Not used in the algorithm itself.
+        self.trajectory = []   # Used for storing the trajectory of the robot for debugging purposes. Not used in the algorithm itself. # TODO remove in final code
 
     def run(self) -> None:
         """
@@ -308,9 +308,9 @@ class Algorithm:
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
         """
         print("returning to garage")
-        # if not self.approach_garage():
-        #     print("Failed to approach garage")
-        #     return
+        if not self.approach_garage():
+            print("Failed to approach garage")
+            return
         if not self.drive_into_garage():
             print("Failed to park into garage")
 
@@ -556,6 +556,39 @@ class Algorithm:
 
         self.robot.cmd_velocity(0, 0)
         return True
+    
+    def rotate_to_angle(self, target_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
+        """
+        Rotate the robot to an absolute yaw angle using odometry.
+
+        Parameters
+        ----------
+        target_yaw : float
+            Desired absolute orientation (yaw) in radians.
+
+        angular_speed : float, optional
+            Initial angular velocity.
+
+        Returns
+        -------
+        bool
+            True if rotation completed successfully, False otherwise.
+        """
+        self.robot.wait_for_odometry()
+        odom = self.robot.get_odometry()
+
+        if odom is None:
+            print("Odometry is None")
+            return False
+
+        current_yaw = odom[2]
+
+        # Compute shortest angular difference
+        target_delta_yaw = normalize_angle(target_yaw - current_yaw)
+
+        print(f"Rotating to absolute yaw {target_yaw:.2f} (delta: {target_delta_yaw:.2f})")
+
+        return self._rotate_by_angle(target_delta_yaw, angular_speed)
 
     def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = SPEED_TO_THE_POINT) -> bool:
         """
