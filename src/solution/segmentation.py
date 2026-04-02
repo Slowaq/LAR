@@ -51,6 +51,9 @@ def find_pylon(frame: np.ndarray):
     return None, None, None, frame_bgr
 
 def find_purple_quads(frame_bgr):
+    """
+    centers i a list of tuples of (column, row)
+    """
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
     lower_purple = np.array([111, 80, 60])

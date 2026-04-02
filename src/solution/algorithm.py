@@ -441,23 +441,23 @@ class Algorithm:
             return False
         # get the center closest to center
         print(f"Unsorted: {centers}")
-        centers.sort(key=lambda x: abs(x[1] - 320))
+        centers.sort(key=lambda x: abs(x[0] - 320))
         print(f"Sorted: {centers}")
-        y, x = centers[0][1], centers[0][0]
-        left_pillar = get_average_of_nearby_pixels(pc, y, x)
+        column, row = centers[0][1], centers[0][0]
+        left_pillar = get_average_of_nearby_pixels(pc, column, row)
         if left_pillar is None:
             print("Could not read left pillar")
         else:
             vis = rgb_image.copy()
 
             # draw point
-            cv2.circle(vis, (x, y), 6, (0, 255, 0), -1)
+            cv2.circle(vis, (row, column), 6, (0, 255, 0), -1)
 
             # format text
             text = f"L: ({left_pillar[0]:.2f}, {left_pillar[1]:.2f}, {left_pillar[2]:.2f})"
 
             # draw text near the point
-            cv2.putText(vis, text, (x + 10, y - 10),
+            cv2.putText(vis, text, (row + 10, column - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             while True:
@@ -483,23 +483,23 @@ class Algorithm:
             return False
         # get the center closest to center
         print(f"Unsorted: {centers}")
-        centers.sort(key=lambda x: abs(x[1] - 320))
+        centers.sort(key=lambda x: abs(x[0] - 320))
         print(f"Sorted: {centers}")
-        y, x = centers[0][1], centers[0][0]
-        right_pillar = get_average_of_nearby_pixels(pc, y, x)
+        column, row = centers[0][1], centers[0][0]
+        right_pillar = get_average_of_nearby_pixels(pc, column, row)
         if right_pillar is None:
             print("Could not read right pillar")
         else:
             vis = rgb_image.copy()
 
             # draw point
-            cv2.circle(vis, (x, y), 6, (0, 0, 255), -1)
+            cv2.circle(vis, (row, column), 6, (0, 0, 255), -1)
 
             # format text
             text = f"R: ({right_pillar[0]:.2f}, {right_pillar[1]:.2f}, {right_pillar[2]:.2f})"
 
             # draw text near the point
-            cv2.putText(vis, text, (x + 10, y - 10),
+            cv2.putText(vis, text, (row + 10, column - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
             while True:
