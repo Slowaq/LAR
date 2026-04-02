@@ -34,7 +34,7 @@ class Algorithm:
         """
         self.stop = False
         # self.exit_garage()
-        # self.robot.reset_odometry()
+        self.robot.reset_odometry()
         # self.approach_pylon()
         # self.drive_around_pylon()
         self.return_to_garage()
@@ -445,25 +445,25 @@ class Algorithm:
         left_pillar = get_average_of_nearby_pixels(pc, column, row)
         if left_pillar is None:
             print("Could not read left pillar")
-        else:
-            vis = rgb_image.copy()
+        # else:
+        #     vis = rgb_image.copy()
 
-            # draw point
-            cv2.circle(vis, (row, column), 6, (0, 255, 0), -1)
+        #     # draw point
+        #     cv2.circle(vis, (row, column), 6, (0, 255, 0), -1)
 
-            # format text
-            text = f"L: ({left_pillar[0]:.2f}, {left_pillar[1]:.2f}, {left_pillar[2]:.2f})"
+        #     # format text
+        #     text = f"L: ({left_pillar[0]:.2f}, {left_pillar[1]:.2f}, {left_pillar[2]:.2f})"
 
-            # draw text near the point
-            cv2.putText(vis, text, (row + 10, column - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        #     # draw text near the point
+        #     cv2.putText(vis, text, (row + 10, column - 10),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            while True:
-                cv2.imshow("Left Pillar", vis)
-                key = cv2.waitKey(1) 
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
+        #     while True:
+        #         cv2.imshow("Left Pillar", vis)
+        #         key = cv2.waitKey(1) 
+        #         if key == 27:
+        #             cv2.destroyAllWindows()
+        #             break
 
         # [3] look at the right pillar directly to get the most accurate depth approximation
         if not self._rotate_to_angle(right_center_target_yaw):
@@ -485,25 +485,25 @@ class Algorithm:
         right_pillar = get_average_of_nearby_pixels(pc, column, row)
         if right_pillar is None:
             print("Could not read right pillar")
-        else:
-            vis = rgb_image.copy()
+        # else:
+        #     vis = rgb_image.copy()
 
-            # draw point
-            cv2.circle(vis, (row, column), 6, (0, 0, 255), -1)
+        #     # draw point
+        #     cv2.circle(vis, (row, column), 6, (0, 0, 255), -1)
 
-            # format text
-            text = f"R: ({right_pillar[0]:.2f}, {right_pillar[1]:.2f}, {right_pillar[2]:.2f})"
+        #     # format text
+        #     text = f"R: ({right_pillar[0]:.2f}, {right_pillar[1]:.2f}, {right_pillar[2]:.2f})"
 
-            # draw text near the point
-            cv2.putText(vis, text, (row + 10, column - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        #     # draw text near the point
+        #     cv2.putText(vis, text, (row + 10, column - 10),
+        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
-            while True:
-                cv2.imshow("Right Pillar", vis)
-                key = cv2.waitKey(1) 
-                if key == 27:
-                    cv2.destroyAllWindows()
-                    break
+        #     while True:
+        #         cv2.imshow("Right Pillar", vis)
+        #         key = cv2.waitKey(1) 
+        #         if key == 27:
+        #             cv2.destroyAllWindows()
+        #             break
 
         # [4] get garage midpoint (everything is relative to robot
         left = (left_pillar[0], left_pillar[2]) # (x,y), where x is right of robot and y is in front of robot
