@@ -527,7 +527,45 @@ class Algorithm:
 
         print(f"Normal: {normal}")
         print(f"Dot product: {dot_product(normal, garage_gate)}")
-        print(f"target point: {target_point}")
+        print(f"target point (local): {target_point}")
+        print(f"current position: {self.robot.get_odometry()}")
+        
+        def local_coords_to_global(local_x: float, local_y: float) -> tuple:
+            """
+            Converts local robot coordinates to global coordinates.
+            Local: +x right, +y front.
+            Global: +x left, +y front.
+            """
+            # Get current robot state
+            # x, y: Global position
+            # yaw: Rotation in radians
+            robot_x, robot_y, yaw = self.robot.get_odometry()
+
+            # 1. Handle the Local-to-Standard conversion
+            # In local space: x is right, y is front. 
+            # To use standard math, let's treat 'right' as -x_standard 
+            # and 'front' as +y_standard.
+            
+            standard_local_x = -local_x 
+            standard_local_y = local_y
+
+            # 2. Rotate the local coordinates by the robot's yaw
+            # Using the standard 2D rotation matrix:
+            # x' = x*cos(theta) - y*sin(theta)
+            # y' = x*sin(theta) + y*cos(theta)
+            
+            rotated_x = (standard_local_x * math.cos(yaw)) - (standard_local_y * math.sin(yaw))
+            rotated_y = (standard_local_x * math.sin(yaw)) + (standard_local_y * math.cos(yaw))
+
+            # 3. Translate to the robot's global position
+            global_x = robot_x + rotated_x
+            global_y = robot_y + rotated_y
+
+            return (global_x, global_y)
+
+        target_point = local_coords_to_global(*target_point)
+        print(f"Target point (global): { target_point}")
+
         input()
 
         # [6] Rotate towards garage
