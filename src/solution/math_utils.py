@@ -95,7 +95,7 @@ def substract_vectors(vec1: tuple, vec2: tuple) -> tuple:
     return (vec1[0] - vec2[0], vec1[1] - vec2[1])
 
 def multiply_vector(vec: tuple, multiplier: float) -> tuple:
-    return (multiplier* vec[0], multiplier * vec[1])
+    return (multiplier * vec[0], multiplier * vec[1])
 
 def normalize_vector(vec: tuple) -> tuple:
     lenght = get_distance(vec, (0,0))

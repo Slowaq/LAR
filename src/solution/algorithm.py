@@ -526,6 +526,7 @@ class Algorithm:
         )
 
         print(f"Normal: {normal}")
+        print(f"Dot product: {dot_product(normal, garage_gate)}")
         print(f"target point: {target_point}")
         input()
 
