@@ -395,25 +395,20 @@ class Algorithm:
             center_yaw = normalize_angle(current_yaw - center_delta_yaw)
             x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
 
-            print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}")
-            centers_data.append({
-                "y" : y,
-                "x" : x,
-                "delta_yaw" : center_delta_yaw
-            })
+            if abs(center_delta_yaw) < 0.2:
+                print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}")
+                centers_data.append({
+                    "y" : y,
+                    "x" : x,
+                    "delta_yaw" : center_delta_yaw
+                })
 
 
-            # --- DEPTH VISUALIZATION ---   # TODO remove ts - debugging visualisation only
+            # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
             image = np.zeros(pc.shape[:2])
 
             mask_depth = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
             image[mask_depth] = np.int8(pc[:, :, 2][mask_depth] / 3.0 * 255)
-
-            depth_vis = cv2.applyColorMap(
-                255 - image.astype(np.uint8),
-                cv2.COLORMAP_JET
-            )   
-
 
             # for (x, y) in centers:
             column, row = center[0], center[1]
@@ -429,14 +424,7 @@ class Algorithm:
                                 (255, 255, 255),
                                 1)
 
-            # Convert BW mask to 3 channels for visualization
-            mask_vis = cv2.cvtColor(frame_bw, cv2.COLOR_GRAY2BGR)
-
-            # Combine annotated RGB, depth, and mask
-            combined = np.hstack((annotated_bgr, depth_vis, mask_vis))
-            display_img = combined.copy()
-
-            cv2.imshow("RGB + Depth (DEBUG)", display_img)
+            cv2.imshow("RGB + Depth (DEBUG)", annotated_bgr.copy())
             cv2.waitKey(1)
 
         return

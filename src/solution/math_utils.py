@@ -1,9 +1,12 @@
 import math
 import numpy as np
 
+import numpy as np
+
 def get_average_of_nearby_pixels(pc, y, x, window_size=5):
     """
-    Compute the average 3D point in a window around (y, x).
+    Compute the average 3D point in a window around (y, x), filtering out
+    points further than 0.1 from the center pixel (or middle column).
 
     Args:
         pc: HxWx3 point cloud (numpy array)
@@ -16,8 +19,11 @@ def get_average_of_nearby_pixels(pc, y, x, window_size=5):
     half_w = window_size // 2
     h, w, _ = pc.shape
 
-    points = []
+    valid_points = []
+    center_p = None
+    middle_col_points = []
 
+    # --- First Pass: Collect valid points and identify reference points ---
     for dy in range(-half_w, half_w + 1):
         for dx in range(-half_w, half_w + 1):
             ny = y + dy
@@ -29,19 +35,45 @@ def get_average_of_nearby_pixels(pc, y, x, window_size=5):
 
             p = pc[ny, nx]
 
-            # Validity checks
-            if not np.all(np.isfinite(p)):
+            # Validity checks (filters out NaNs, Infs, and [0,0,0])
+            if not np.all(np.isfinite(p)) or np.allclose(p, 0):
                 continue
 
-            if np.allclose(p, 0):
-                continue
+            valid_points.append(p)
 
-            points.append(p)
+            # Store references for the distance check
+            if dx == 0:
+                middle_col_points.append(p)
+                if dy == 0:
+                    center_p = p
 
-    if len(points) == 0:
+    if not valid_points:
         return None
 
-    return np.mean(points, axis=0)
+    # --- Determine the reference points for distance filtering ---
+    if center_p is not None:
+        ref_points = [center_p]
+    elif middle_col_points:
+        ref_points = middle_col_points
+    else:
+        # If both the center and the entire middle column are invalid/empty,
+        # we have no reference to compare against.
+        return None
+
+    # --- Second Pass: Filter based on 0.1 distance threshold ---
+    filtered_points = []
+    for p in valid_points:
+        # Check Euclidean distance between the point and the reference point(s)
+        # If it's <= 0.1 to ANY valid reference point, we keep it.
+        distances = [np.linalg.norm(p - ref) for ref in ref_points]
+        
+        if min(distances) <= 0.1:
+            filtered_points.append(p)
+
+    if len(filtered_points) == 0:
+        return None
+
+    return np.mean(filtered_points, axis=0)
 
 def get_distance(point1: list, point2: list) -> float:
     """
