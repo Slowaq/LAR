@@ -546,7 +546,7 @@ class Algorithm:
             # To use standard math, let's treat 'right' as -x_standard 
             # and 'front' as +y_standard.
             
-            standard_local_x = -local_x 
+            standard_local_x = local_x 
             standard_local_y = local_y
 
             # 2. Rotate the local coordinates by the robot's yaw
@@ -567,7 +567,7 @@ class Algorithm:
         print(f"Target point (global): { target_point}")
         self._go_to_point_using_odometry(*target_point)
 
-        input()
+        return
 
         # [6] Rotate towards garage
 
