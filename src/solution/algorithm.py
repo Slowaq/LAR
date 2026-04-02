@@ -385,7 +385,8 @@ class Algorithm:
             # Focus only on the center that is in the middle of screen, because that is where depth camera is the most accurate
             centers.sort(key=lambda x: abs(x[0] - 320))
             center = centers[0]
-            center_point = get_average_of_nearby_pixels(pc, center[1], center[0])
+            column, row =  center[0], center[1]
+            center_point = get_average_of_nearby_pixels(pc, row, column)
             if center_point is None:
                 print("Center point is none in point cloud")
                 continue
@@ -409,9 +410,6 @@ class Algorithm:
 
             mask_depth = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
             image[mask_depth] = np.int8(pc[:, :, 2][mask_depth] / 3.0 * 255)
-
-            # for (x, y) in centers:
-            column, row = center[0], center[1]
 
             if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
                 distance = center_point[2]
