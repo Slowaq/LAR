@@ -410,7 +410,7 @@ class Algorithm:
                     x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
                     found_centers_yaw.append(center_yaw)
                     pprint(found_centers_yaw)
-                    print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}")
+                    print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw}")
                     print("Starting spinning")
                     stop_spinning = False
 
@@ -420,7 +420,7 @@ class Algorithm:
                     continue
 
                 else:
-                    print(f"Not stopping for this - the closes center is {min([abs(current_yaw - x) for x in found_centers_yaw])}")
+                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - x) for x in found_centers_yaw])}")
             else:
                 print("Center is not in the middle of camera")
 
