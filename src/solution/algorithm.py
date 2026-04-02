@@ -355,7 +355,7 @@ class Algorithm:
         left_center_target_yaw, right_center_target_yaw = None, None
         origin_yaw = self.robot.get_odometry()[2]
         left_origin = False
-        found_centers_yaw = []
+        found_centers = []
         stop_spinning = False
 
         # [1] Find the two purple pillars - do a circle
@@ -379,10 +379,9 @@ class Algorithm:
 
             if left_origin and abs(normalize_angle(current_yaw -origin_yaw)) < 0.2:
                 print("Back at origin")
-                pprint(found_centers_yaw)
-                left_origin = False
-                # cv2.destroyAllWindows()
-                # break
+                pprint(found_centers)
+                cv2.destroyAllWindows()
+                break
 
             centers, annotated_bgr, _ = find_purple_quads(rgb_image)
 
@@ -409,121 +408,44 @@ class Algorithm:
                 
                 if stop_spinning:
                     # We have accurate read
-                    found_centers_yaw.append(center_yaw)
-                    pprint(found_centers_yaw)
+                    found_centers.append(x, y, center_yaw)
+                    pprint(found_centers)
                     print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw:.2f}")
                     print("Starting spinning")
                     stop_spinning = False
 
-                elif not any([abs((current_yaw - center_delta_yaw) - x) < 0.05 for x in found_centers_yaw]):
+                elif not any([abs((current_yaw - center_delta_yaw) - x[2]) < 0.1 for x in found_centers]):
                     print("Stopping spinning")
                     stop_spinning = True    # Robot will stop and wait for fresh pointcloud and rgb data
                     continue
 
                 else:
-                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - center_delta_yaw - x) for x in found_centers_yaw]):.2f}")
+                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - center_delta_yaw - x[2]) for x in found_centers]):.2f}")
             else:
                 print("Center is not in the middle of camera")
 
 
-            # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
+            # # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
 
-            if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-                if center_point is not None:
-                    distance = center_point[2]
-                    if not np.isnan(distance):
-                        cv2.putText(annotated_bgr,
-                                    f"{distance:.2f} m, column={column:.2f},row={row:.2f}pc={center_point}",
-                                    (column - 40, row - 20),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.5,
-                                    (255, 255, 255),
-                                    1)
+            # if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
+            #     if center_point is not None:
+            #         distance = center_point[2]
+            #         if not np.isnan(distance):
+            #             cv2.putText(annotated_bgr,
+            #                         f"{distance:.2f} m, column={column:.2f},row={row:.2f}pc={center_point}",
+            #                         (column - 40, row - 20),
+            #                         cv2.FONT_HERSHEY_SIMPLEX,
+            #                         0.5,
+            #                         (255, 255, 255),
+            #                         1)
 
-            cv2.imshow("RGB + Depth (DEBUG)", annotated_bgr.copy())
-            cv2.waitKey(1)
+            # cv2.imshow("RGB + Depth (DEBUG)", annotated_bgr.copy())
+            # cv2.waitKey(1)
 
+        print(f"found centers:")
+        pprint(found_centers)
         return
 
-        # [2] look at the left pillar directly to get the most accurate depth approximation
-        if not self._rotate_to_angle(left_center_target_yaw):
-            return False
-        
-        self.robot.wait_for_point_cloud()
-        self.robot.wait_for_rgb_image()
-        self.robot.wait_for_odometry()
-        left_actual_yaw = self.robot.get_odometry()[2]
-        rgb_image = self.robot.get_rgb_image()
-        pc = self.robot.get_point_cloud()
-        centers, _, _ = find_purple_quads(rgb_image)
-        if not centers:
-            print("Robot does not see left pillar")
-            return False
-        # get the center closest to center of camera
-        centers.sort(key=lambda x: abs(x[0] - 320))
-        column, row = centers[0][1], centers[0][0]
-        left_pillar = get_average_of_nearby_pixels(pc, column, row)
-        if left_pillar is None:
-            print("Could not read left pillar")
-        # else:
-        #     vis = rgb_image.copy()
-
-        #     # draw point
-        #     cv2.circle(vis, (row, column), 6, (0, 255, 0), -1)
-
-        #     # format text
-        #     text = f"L: ({left_pillar[0]:.2f}, {left_pillar[1]:.2f}, {left_pillar[2]:.2f})"
-
-        #     # draw text near the point
-        #     cv2.putText(vis, text, (row + 10, column - 10),
-        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-        #     while True:
-        #         cv2.imshow("Left Pillar", vis)
-        #         key = cv2.waitKey(1) 
-        #         if key == 27:
-        #             cv2.destroyAllWindows()
-        #             break
-
-        # [3] look at the right pillar directly to get the most accurate depth approximation
-        if not self._rotate_to_angle(right_center_target_yaw):
-            return False
-        
-        self.robot.wait_for_point_cloud()
-        self.robot.wait_for_rgb_image()
-        self.robot.wait_for_odometry()
-        right_actual_yaw = self.robot.get_odometry()[2]
-        rgb_image = self.robot.get_rgb_image()
-        pc = self.robot.get_point_cloud()
-        centers, _, _ = find_purple_quads(rgb_image)
-        if not centers:
-            print("Robot does not see right pillar")
-            return False
-        # get the center closest to center of camera
-        centers.sort(key=lambda x: abs(x[0] - 320))
-        column, row = centers[0][1], centers[0][0]
-        right_pillar = get_average_of_nearby_pixels(pc, column, row)
-        if right_pillar is None:
-            print("Could not read right pillar")
-        # else:
-        #     vis = rgb_image.copy()
-
-        #     # draw point
-        #     cv2.circle(vis, (row, column), 6, (0, 0, 255), -1)
-
-        #     # format text
-        #     text = f"R: ({right_pillar[0]:.2f}, {right_pillar[1]:.2f}, {right_pillar[2]:.2f})"
-
-        #     # draw text near the point
-        #     cv2.putText(vis, text, (row + 10, column - 10),
-        #                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
-        #     while True:
-        #         cv2.imshow("Right Pillar", vis)
-        #         key = cv2.waitKey(1) 
-        #         if key == 27:
-        #             cv2.destroyAllWindows()
-        #             break
 
         # [4] get garage midpoint (everything is relative to robot
         left = (left_pillar[0], left_pillar[2]) # (x,y), where x is right of robot and y is in front of robot
