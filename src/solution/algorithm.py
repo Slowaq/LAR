@@ -396,7 +396,7 @@ class Algorithm:
             column, row =  center[0], center[1]
             center_point = None
 
-            if abs(center[0]-320) < 100 or not stop_spinning:
+            if abs(center[0]-320) < 100 or stop_spinning:
                 center_point = get_average_of_nearby_pixels(pc, row, column)
                 if center_point is None:
                     print("Center point is none in point cloud")
