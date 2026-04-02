@@ -382,6 +382,9 @@ class Algorithm:
             centers.sort(key=lambda x: abs(x[0] - 320))
             center = centers[0]
             center_point = get_average_of_nearby_pixels(pc, center[1], center[0])
+            if center_point is None:
+                print("Center point is none in point cloud")
+                continue
             center_delta_x = center_point[0]
             center_delta_z = center_point[2]
             center_delta_yaw = math.atan2(center_delta_x, center_delta_z)
@@ -394,29 +397,6 @@ class Algorithm:
                 "delta_yaw" : center_delta_yaw
             })
 
-
-
-
-            # left_center = centers[0] # (y, x)
-            # left_center_point = get_average_of_nearby_pixels(pc, left_center[1], left_center[0])
-            # if left_center_point is None:
-            #     print("Couldnt read pointcloud of left pillar center point")
-            #     return False
-            # left_center_delta_x = left_center_point[0]
-            # left_center_delta_z = left_center_point[2]
-            # left_center_delta_yaw = math.atan2(left_center_delta_x, left_center_delta_z)
-            # left_center_target_yaw = normalize_angle(current_yaw - left_center_delta_yaw)
-            # right_center = centers[1]
-            # right_center_point = get_average_of_nearby_pixels(pc,right_center[1], right_center[0])
-            # if right_center_point is None:
-            #     print("Couldnt read pointcloud of right pillar center point")
-            #     return False
-            # right_center_delta_x = right_center_point[0]
-            # right_center_delta_z = right_center_point[2]
-            # right_center_delta_yaw = math.atan2(right_center_delta_x, right_center_delta_z)
-            # right_center_target_yaw = normalize_angle(current_yaw - right_center_delta_yaw)
-            # print(f"left_delta={left_center_delta_yaw:.2f}, right_delta={right_center_delta_yaw:.2f}, current={current_yaw:.2f}, left={left_center_target_yaw:.2f}, right={right_center_target_yaw:.2f}")
-    
 
             # --- DEPTH VISUALIZATION ---   # TODO remove ts - debugging visualisation only
             image = np.zeros(pc.shape[:2])
@@ -434,11 +414,11 @@ class Algorithm:
             column, row = center[0], center[1]
 
             if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-                distance = pc[row, column, 2]
+                distance = center_point[2]
                 if not np.isnan(distance):
                     cv2.putText(annotated_bgr,
-                                f"{distance:.2f} m, x={column:.2f},y={row:.2f}\npc={pc[row,column,:]}",
-                                (x - 40, y - 20),
+                                f"{distance:.2f} m, x={column:.2f},y={row:.2f}\npc={center_point}",
+                                (column - 40, row - 20),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 0.5,
                                 (255, 255, 255),
