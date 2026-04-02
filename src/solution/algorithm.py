@@ -352,7 +352,6 @@ class Algorithm:
         # byt natocen k piliri primo. Pilir nesmi byt na okraji obrazovky - vznika chyba.
         # Podle piliru dopocitat bod, na ose mezi piliri pred garazi a dojet tam a natocit se presne do garaze 
 
-        left_center_target_yaw, right_center_target_yaw = None, None
         origin_yaw = self.robot.get_odometry()[2]
         left_origin = False
         found_centers = []
@@ -361,7 +360,7 @@ class Algorithm:
         # [1] Find the two purple pillars - do a circle
         while not self.robot.is_shutting_down() and not self.stop:
             if not stop_spinning: 
-                self.robot.cmd_velocity(0, 0.2)
+                self.robot.cmd_velocity(0, 0.4)
             else:                
                 self.robot.cmd_velocity(0, 0)
                 self.robot.wait_for_point_cloud()
@@ -379,7 +378,6 @@ class Algorithm:
 
             if left_origin and abs(normalize_angle(current_yaw -origin_yaw)) < 0.2:
                 print("Back at origin")
-                pprint(found_centers)
                 cv2.destroyAllWindows()
                 break
 
@@ -414,7 +412,7 @@ class Algorithm:
                     print("Starting spinning")
                     stop_spinning = False
 
-                elif not any([abs((current_yaw - center_delta_yaw) - x[2]) < 0.1 for x in found_centers]):
+                elif not any([abs((current_yaw - center_delta_yaw) - x[2]) < 0.2 for x in found_centers]):
                     print("Stopping spinning")
                     stop_spinning = True    # Robot will stop and wait for fresh pointcloud and rgb data
                     continue
@@ -444,20 +442,27 @@ class Algorithm:
 
         print(f"found centers:")
         pprint(found_centers)
-        return
+        if len(found_centers) != 2:
+            print(f"Found {len(found_centers)} purple pillars, not 2")
+            return False
+        
+        odometry = self.robot.get_odometry()
+        left = found_centers[0][:2]
+        left_globaly = (left[1]+odometry[0], -left[0]+odometry[1])
+        right = found_centers[1][:2]
+        right_globaly = (right[1]+odometry[0], -right[0]+odometry[1])
 
 
         # [4] get garage midpoint (everything is relative to robot
-        left = (left_pillar[0], left_pillar[2]) # (x,y), where x is right of robot and y is in front of robot
-        print(f"left pillar originaly: {left}")
-        right = (right_pillar[0], right_pillar[2])
-        print(f"right pillar: {right}")
-        phi = normalize_angle(left_actual_yaw - right_actual_yaw)
-        left = rotate_vector(*left, phi)  
-        print(f"left yaw: {left_actual_yaw:.2f}, right yaw: {right_actual_yaw:.2f}")
-        print(f"left pillar after rotation by {phi:.2f}: {left}")
-        garage_gate = average_vector(left, right)
+        print(f"left localy: {left}")
+        print(f"right localy: {right}")
+        print(f"odometry: {odometry}")
+        print(f"left globally: {left_globaly}")
+        print(f"right globally: {right_globaly}")
+        garage_gate = average_vector(left_globaly, right_globaly)
         print(f"garage_gate: {garage_gate}")
+        self._go_to_point_using_odometry(*garage_gate)
+        return
 
 
         # [5] calculate the point to go to
