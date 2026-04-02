@@ -9,13 +9,13 @@ from pprint import pprint
 EXIT_ANGULAR_VELOCITY = 0.3
 DISTANCE_TOL = 0.085
 SPEED_TO_THE_POINT = 0.3
-ANGULAR_TO_THE_POINT = 0.7
-ANGULAR_TO_THE_POINT_CLAMP = 0.5
-MINIMAL_ANGULAR_VELOCITY = 0.10
+ANGULAR_TO_THE_POINT = 0.9
+ANGULAR_TO_THE_POINT_CLAMP = 0.7
+MINIMAL_ANGULAR_VELOCITY = 0.2
 KP_ANG = 5.0   # proportional gain for heading correction, proportional to angle error in radians
 KP_ANG_PIXELS = 0.003 # proportional gain for heading correction, proportional to angle error pixels
 DISTANCE_OUT_OF_GARAGE = 0.5 # [m] how far should the robot drive out ouf the garade in the exit_garage() method
-GARAGE_WALL_DISTANCE = 0.35 # [m] distance from the wall when parking into garage
+GARAGE_WALL_DISTANCE = 0.40 # [m] distance from the wall when parking into garage
 FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
@@ -34,10 +34,10 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        # self.exit_garage()
+        self.exit_garage()
         self.robot.reset_odometry()
-        # self.approach_pylon()
-        # self.drive_around_pylon()
+        self.approach_pylon()
+        self.drive_around_pylon()
         self.return_to_garage()
 
         if self.stop:
