@@ -15,7 +15,7 @@ MINIMAL_ANGULAR_VELOCITY = 0.10
 KP_ANG = 5.0   # proportional gain for heading correction, proportional to angle error in radians
 KP_ANG_PIXELS = 0.003 # proportional gain for heading correction, proportional to angle error pixels
 DISTANCE_OUT_OF_GARAGE = 0.5 # [m] how far should the robot drive out ouf the garade in the exit_garage() method
-GARAGE_WALL_DISTANCE = 0.26 # [m] distance from the wall when parking into garage
+GARAGE_WALL_DISTANCE = 0.35 # [m] distance from the wall when parking into garage
 FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
@@ -530,7 +530,7 @@ class Algorithm:
 
             self.robot.cmd_velocity(0.05, angular)
 
-
+            print(f"Distance: {dist:.2f}, thres: {GARAGE_WALL_DISTANCE:.2f}")
             if dist > GARAGE_WALL_DISTANCE:
                 self.robot.cmd_velocity(LINEAR_PARKING_VELOCITY, 0)
             else:
