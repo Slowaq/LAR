@@ -382,8 +382,8 @@ class Algorithm:
             centers.sort(key=lambda x: abs(x[0] - 320))
             center = centers[0]
             center_point = get_average_of_nearby_pixels(pc, center[1], center[0])
-            center_delta_x = center[0]
-            center_delta_z = center[2]
+            center_delta_x = center_point[0]
+            center_delta_z = center_point[2]
             center_delta_yaw = math.atan2(center_delta_x, center_delta_z)
             center_yaw = normalize_angle(current_yaw - center_delta_yaw)
             x, y = rotate_vector(center_delta_x, center_delta_z, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
