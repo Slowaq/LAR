@@ -352,39 +352,69 @@ class Algorithm:
         # Podle piliru dopocitat bod, na ose mezi piliri pred garazi a dojet tam a natocit se presne do garaze 
 
         left_center_target_yaw, right_center_target_yaw = None, None
+        origin_yaw = self.robot.get_odometry()[2]
+        left_origin = False
+        centers_data = []
 
-        # [1] Find the two purple pillars
+        # [1] Find the two purple pillars - do a circle
         while not self.robot.is_shutting_down() and not self.stop:
+            self.robot.cmd_velocity(0, ANGULAR_TO_THE_POINT)
             rgb_image = self.robot.get_rgb_image()
             pc = self.robot.get_point_cloud()
             odometry = self.robot.get_odometry()
             current_yaw = odometry[2]
 
+            if not left_origin and abs(normalize_angle(current_yaw - origin_yaw)) > 0.5:
+                left_origin = True
+                print("Left origin")
+
+            if left_origin and abs(normalize_angle(current_yaw -origin_yaw)) < 0.2:
+                print("Back at origin")
+                cv2.destroyAllWindows()
+                break
+
             centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
-            if len(centers) != 2:
-                # self.robot.cmd_velocity(0, 0.4)
+
+            if not centers: 
                 continue
 
-            left_center = centers[0] # (y, x)
-            left_center_point = get_average_of_nearby_pixels(pc, left_center[1], left_center[0])
-            if left_center_point is None:
-                print("Couldnt read pointcloud of left pillar center point")
-                return False
-            left_center_delta_x = left_center_point[0]
-            left_center_delta_z = left_center_point[2]
-            left_center_delta_yaw = math.atan2(left_center_delta_x, left_center_delta_z)
-            left_center_target_yaw = normalize_angle(current_yaw - left_center_delta_yaw)
-            right_center = centers[1]
-            right_center_point = get_average_of_nearby_pixels(pc,right_center[1], right_center[0])
-            if right_center_point is None:
-                print("Couldnt read pointcloud of right pillar center point")
-                return False
-            right_center_delta_x = right_center_point[0]
-            right_center_delta_z = right_center_point[2]
-            right_center_delta_yaw = math.atan2(right_center_delta_x, right_center_delta_z)
-            right_center_target_yaw = normalize_angle(current_yaw - right_center_delta_yaw)
-            print(f"left_delta={left_center_delta_yaw:.2f}, right_delta={right_center_delta_yaw:.2f}, current={current_yaw:.2f}, left={left_center_target_yaw:.2f}, right={right_center_target_yaw:.2f}")
-            break
+            # Focus only on the center that is in the middle of screen, because that is where depth camera is the most accurate
+            centers.sort(key=lambda x: abs(x[0] - 320))
+            center = centers[0]
+            center_delta_x = center[0]
+            center_delta_z = center[2]
+            center_delta_yaw = math.atan2(center_delta_x, center_delta_z)
+            center_yaw = normalize_angle(current_yaw - center_delta_yaw)
+            x, y = rotate_vector(center_delta_x, center_delta_z, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+
+            centers_data.append({
+                "y" : y,
+                "x" : x,
+                "delta_yaw" : center_delta_yaw
+            })
+
+
+
+
+            # left_center = centers[0] # (y, x)
+            # left_center_point = get_average_of_nearby_pixels(pc, left_center[1], left_center[0])
+            # if left_center_point is None:
+            #     print("Couldnt read pointcloud of left pillar center point")
+            #     return False
+            # left_center_delta_x = left_center_point[0]
+            # left_center_delta_z = left_center_point[2]
+            # left_center_delta_yaw = math.atan2(left_center_delta_x, left_center_delta_z)
+            # left_center_target_yaw = normalize_angle(current_yaw - left_center_delta_yaw)
+            # right_center = centers[1]
+            # right_center_point = get_average_of_nearby_pixels(pc,right_center[1], right_center[0])
+            # if right_center_point is None:
+            #     print("Couldnt read pointcloud of right pillar center point")
+            #     return False
+            # right_center_delta_x = right_center_point[0]
+            # right_center_delta_z = right_center_point[2]
+            # right_center_delta_yaw = math.atan2(right_center_delta_x, right_center_delta_z)
+            # right_center_target_yaw = normalize_angle(current_yaw - right_center_delta_yaw)
+            # print(f"left_delta={left_center_delta_yaw:.2f}, right_delta={right_center_delta_yaw:.2f}, current={current_yaw:.2f}, left={left_center_target_yaw:.2f}, right={right_center_target_yaw:.2f}")
     
 
             # --- DEPTH VISUALIZATION ---   # TODO remove ts - debugging visualisation only
@@ -399,17 +429,19 @@ class Algorithm:
             )   
 
 
-            for (x, y) in centers:
-                if 0 <= y < pc.shape[0] and 0 <= x < pc.shape[1]:
-                    distance = pc[y, x, 2]
-                    if not np.isnan(distance):
-                        cv2.putText(annotated_bgr,
-                                    f"{distance:.2f} m, x={x:.2f},y={y:.2f}\npc={pc[y,x,:]}",
-                                    (x - 40, y - 20),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.5,
-                                    (255, 255, 255),
-                                    1)
+            # for (x, y) in centers:
+            column, row = center[0], center[1]
+
+            if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
+                distance = pc[row, column, 2]
+                if not np.isnan(distance):
+                    cv2.putText(annotated_bgr,
+                                f"{distance:.2f} m, x={column:.2f},y={row:.2f}\npc={pc[row,column,:]}",
+                                (x - 40, y - 20),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5,
+                                (255, 255, 255),
+                                1)
 
             # Convert BW mask to 3 channels for visualization
             mask_vis = cv2.cvtColor(frame_bw, cv2.COLOR_GRAY2BGR)
@@ -419,11 +451,9 @@ class Algorithm:
             display_img = combined.copy()
 
             cv2.imshow("RGB + Depth (DEBUG)", display_img)
-            key = cv2.waitKey(1)
-            if key == 27:  # ESC to exit
-                break
+            cv2.waitKey(1)
 
-        # cv2.destroyAllWindows()
+        return
 
         # [2] look at the left pillar directly to get the most accurate depth approximation
         if not self._rotate_to_angle(left_center_target_yaw):
