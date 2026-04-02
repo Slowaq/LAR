@@ -381,6 +381,7 @@ class Algorithm:
             # Focus only on the center that is in the middle of screen, because that is where depth camera is the most accurate
             centers.sort(key=lambda x: abs(x[0] - 320))
             center = centers[0]
+            center_point = get_average_of_nearby_pixels(pc, center[1], center[0])
             center_delta_x = center[0]
             center_delta_z = center[2]
             center_delta_yaw = math.atan2(center_delta_x, center_delta_z)
