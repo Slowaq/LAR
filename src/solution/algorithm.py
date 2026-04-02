@@ -529,39 +529,31 @@ class Algorithm:
         print(f"Dot product: {dot_product(normal, garage_gate)}")
         print(f"target point (local): {target_point}")
         print(f"current position: {self.robot.get_odometry()}")
-        
-        def local_coords_to_global(local_x: float, local_y: float) -> tuple:
+
+        def local_coords_to_global(self, local_x: float, local_y: float) -> tuple:
             """
-            Converts local robot coordinates to global coordinates.
-            Local: +x right, +y front.
-            Global: +x left, +y front.
+            local x is positive right of the robot. 
+            local y is positive to the front of the robot.
+            Global x is positive in front (North/Forward).
+            Global y is positive to the left (West/Left).
             """
-            # Get current robot state
-            # x, y: Global position
-            # yaw: Rotation in radians
-            robot_x, robot_y, yaw = self.robot.get_odometry()
+            # x, y are the robot's current position in the global frame
+            rx, ry, yaw = self.robot.get_odometry()
 
-            # 1. Handle the Local-to-Standard conversion
-            # In local space: x is right, y is front. 
-            # To use standard math, let's treat 'right' as -x_standard 
-            # and 'front' as +y_standard.
+            # Step 1: Map local inputs to a standard 'Forward/Left' local frame
+            # Your local_y is forward (standard local x)
+            # Your local_x is right (so -local_x is standard local y)
+            forward = local_y
+            left = -local_x
+
+            # Step 2: Apply rotation matrix
+            # global_x = robot_x + (forward * cos(yaw) - left * sin(yaw))
+            # global_y = robot_y + (forward * sin(yaw) + left * cos(yaw))
             
-            standard_local_x = local_x 
-            standard_local_y = local_y
+            glob_x = rx + (forward * math.cos(yaw) - left * math.sin(yaw))
+            glob_y = ry + (forward * math.sin(yaw) + left * math.cos(yaw))
 
-            # 2. Rotate the local coordinates by the robot's yaw
-            # Using the standard 2D rotation matrix:
-            # x' = x*cos(theta) - y*sin(theta)
-            # y' = x*sin(theta) + y*cos(theta)
-            
-            rotated_x = (standard_local_x * math.cos(yaw)) - (standard_local_y * math.sin(yaw))
-            rotated_y = (standard_local_x * math.sin(yaw)) + (standard_local_y * math.cos(yaw))
-
-            # 3. Translate to the robot's global position
-            global_x = robot_x + rotated_x
-            global_y = robot_y + rotated_y
-
-            return (global_x, global_y)
+            return (glob_x, glob_y)
 
         target_point = local_coords_to_global(*target_point)
         print(f"Target point (global): { target_point}")
