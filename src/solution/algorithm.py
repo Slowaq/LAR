@@ -466,55 +466,10 @@ class Algorithm:
         left_to_right_angle = math.atan2(
             right[0] - left[0],
             right[1] - left[1]
-        )
+        ) + math.pi / 2
         print(f"target angle: {left_to_right_angle}")
 
         self._rotate_to_angle(left_to_right_angle)
-        return
-
-
-        # [5] calculate the point to go to
-        normal = normalize_vector(substract_vectors(left, right))
-        target_point = multiply_vector(
-            normal,
-            dot_product(normal, garage_gate)
-        )
-
-        print(f"Normal: {normal}")
-        print(f"Dot product: {dot_product(normal, garage_gate)}")
-        print(f"target point (local): {target_point}")
-        print(f"current position: {self.robot.get_odometry()}")
-
-        def local_coords_to_global(local_x: float, local_y: float) -> tuple:
-            """
-            local x is positive right of the robot. 
-            local y is positive to the front of the robot.
-            Global x is positive in front (North/Forward).
-            Global y is positive to the left (West/Left).
-            """
-            # x, y are the robot's current position in the global frame
-            rx, ry, yaw = self.robot.get_odometry()
-
-            # Step 1: Map local inputs to a standard 'Forward/Left' local frame
-            # Your local_y is forward (standard local x)
-            # Your local_x is right (so -local_x is standard local y)
-            forward = local_y
-            left = -local_x
-
-            # Step 2: Apply rotation matrix
-            # global_x = robot_x + (forward * cos(yaw) - left * sin(yaw))
-            # global_y = robot_y + (forward * sin(yaw) + left * cos(yaw))
-            
-            glob_x = rx + (forward * math.cos(yaw) - left * math.sin(yaw))
-            glob_y = ry + (forward * math.sin(yaw) + left * math.cos(yaw))
-
-            return (glob_x, glob_y)
-
-        target_point = local_coords_to_global(*target_point)
-        print(f"Target point (global): { target_point}")
-        self._go_to_point_using_odometry(*target_point)
-
-        return
 
         # [6] Rotate towards garage
 
