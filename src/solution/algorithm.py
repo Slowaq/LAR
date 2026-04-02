@@ -410,11 +410,11 @@ class Algorithm:
                     x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
                     found_centers_yaw.append(center_yaw)
                     pprint(found_centers_yaw)
-                    print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw}")
+                    print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw:.2f}")
                     print("Starting spinning")
                     stop_spinning = False
 
-                elif not any([abs(current_yaw - x) < 0.05 for x in found_centers_yaw]):
+                elif not any([abs((current_yaw - center_delta_yaw) - x) < 0.05 for x in found_centers_yaw]):
                     print("Stopping spinning")
                     stop_spinning = True    # Robot will stop and wait for fresh pointcloud and rgb data
                     continue
