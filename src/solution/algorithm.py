@@ -34,11 +34,11 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        self.exit_garage()
+        # self.exit_garage()
         self.robot.reset_odometry()
-        self.approach_pylon()
+        # self.approach_pylon()
         # self.drive_around_pylon()
-        # self.return_to_garage()
+        self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
@@ -397,17 +397,18 @@ class Algorithm:
             center_point = None
 
             if abs(center[0]-320) < 100:
+                center_point = get_average_of_nearby_pixels(pc, row, column)
+                if center_point is None:
+                    print("Center point is none in point cloud")
+                    continue
+                center_delta_x = center_point[0]
+                center_delta_y = center_point[2]
+                center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
+                center_yaw = normalize_angle(current_yaw - center_delta_yaw)
+                x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+                
                 if stop_spinning:
-                    # Get accurate read
-                    center_point = get_average_of_nearby_pixels(pc, row, column)
-                    if center_point is None:
-                        print("Center point is none in point cloud")
-                        continue
-                    center_delta_x = center_point[0]
-                    center_delta_y = center_point[2]
-                    center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
-                    center_yaw = normalize_angle(current_yaw - center_delta_yaw)
-                    x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+                    # We have accurate read
                     found_centers_yaw.append(center_yaw)
                     pprint(found_centers_yaw)
                     print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw:.2f}")
@@ -420,7 +421,7 @@ class Algorithm:
                     continue
 
                 else:
-                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - x) for x in found_centers_yaw])}")
+                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - center_delta_yaw - x) for x in found_centers_yaw])}")
             else:
                 print("Center is not in the middle of camera")
 
