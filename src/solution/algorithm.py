@@ -20,7 +20,7 @@ FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
 LINEAR_PARKING_VELOCITY = 0.1
-PATH_AROUND_PYLON = [(0.0,  0.33), (0.65, 0.33), (0.65, -0.33), (0.0, -0.33)]
+PATH_AROUND_PYLON = [(0.2,  0.33), (0.70, 0.33), (0.70, -0.33), (0.2, -0.33)]
 
 class Algorithm:
     def __init__(self):
@@ -309,9 +309,9 @@ class Algorithm:
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
         """
         print("returning to garage")
-        # if not self.approach_garage():
-        #     print("Failed to approach garage")
-        #     return
+        if not self.approach_garage():
+            print("Failed to approach garage")
+            return
         if not self.drive_into_garage():
             print("Failed to park into garage")
 
