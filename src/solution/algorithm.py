@@ -1,6 +1,6 @@
 from robolab_turtlebot import Turtlebot
 from .segmentation import find_pylon, find_purple_quads
-from .math_utils import normalize_angle, get_distance, get_average_of_nearby_pixels, rotate_vector, average_vector
+from .math_utils import *
 import numpy as np
 import cv2
 import math
@@ -516,6 +516,20 @@ class Algorithm:
         print(f"left pillar after rotation by {phi:.2f}: {left}")
         garage_gate = average_vector(left, right)
         print(f"garage_gate: {garage_gate}")
+
+
+        # [5] calculate the point to go to
+        normal = normalize_vector(substract_vectors(left, right))
+        target_point = multiply_vector(
+            normal,
+            dot_product(normal, garage_gate)
+        )
+
+        print(f"Normal: {normal}")
+        print(f"target point: {target_point}")
+        input()
+
+        # [6] Rotate towards garage
 
         # Predpokladame, ze robot stoji na ose mezi fialovymi piliri
 
