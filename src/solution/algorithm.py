@@ -530,7 +530,7 @@ class Algorithm:
         print(f"target point (local): {target_point}")
         print(f"current position: {self.robot.get_odometry()}")
 
-        def local_coords_to_global(self, local_x: float, local_y: float) -> tuple:
+        def local_coords_to_global(local_x: float, local_y: float) -> tuple:
             """
             local x is positive right of the robot. 
             local y is positive to the front of the robot.
