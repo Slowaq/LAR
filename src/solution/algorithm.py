@@ -448,9 +448,9 @@ class Algorithm:
         
         odometry = self.robot.get_odometry()
         left = found_centers[0][:2]
-        left_globaly = (left[1]+odometry[0], -left[0]+odometry[1])
+        left_globaly = (left[1]+odometry[0], left[0]-odometry[1])
         right = found_centers[1][:2]
-        right_globaly = (right[1]+odometry[0], -right[0]+odometry[1])
+        right_globaly = (right[1]+odometry[0], right[0]-odometry[1])
 
 
         # [4] get garage midpoint (everything is relative to robot
