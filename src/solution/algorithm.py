@@ -355,13 +355,21 @@ class Algorithm:
         left_center_target_yaw, right_center_target_yaw = None, None
         origin_yaw = self.robot.get_odometry()[2]
         left_origin = False
-        centers_data = []
+        found_centers_yaw = []
+        stop_spinning = False
 
         # [1] Find the two purple pillars - do a circle
         while not self.robot.is_shutting_down() and not self.stop:
-            # self.robot.cmd_velocity(0, 0.2)
+            if not stop_spinning: 
+                self.robot.cmd_velocity(0, 0.2)
+            else:                
+                self.robot.cmd_velocity(0, 0)
+                self.robot.wait_for_point_cloud()
+                self.robot.wait_for_rgb_image()
+                self.robot.cmd_velocity(0,0)
+
+            pc = self.robot.get_point_cloud()   # Robot should not be moving while waiting for point cloud
             rgb_image = self.robot.get_rgb_image()
-            pc = self.robot.get_point_cloud()
             odometry = self.robot.get_odometry()
             current_yaw = odometry[2]
 
@@ -371,12 +379,12 @@ class Algorithm:
 
             if left_origin and abs(normalize_angle(current_yaw -origin_yaw)) < 0.2:
                 print("Back at origin")
-                pprint(centers_data)
+                pprint(found_centers_yaw)
                 left_origin = False
                 # cv2.destroyAllWindows()
                 # break
 
-            centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
+            centers, annotated_bgr, _ = find_purple_quads(rgb_image)
 
             if not centers: 
                 print(f"No centers found")
@@ -386,41 +394,43 @@ class Algorithm:
             centers.sort(key=lambda x: abs(x[0] - 320))
             center = centers[0]
             column, row =  center[0], center[1]
-            center_point = get_average_of_nearby_pixels(pc, row, column)
-            if center_point is None:
-                print("Center point is none in point cloud")
-                continue
-            center_delta_x = center_point[0]
-            center_delta_y = center_point[2]
-            center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
-            center_yaw = normalize_angle(current_yaw - center_delta_yaw)
-            x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+            center_point = None
 
-            if abs(center_delta_yaw) < 0.2:
-                print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}")
-                centers_data.append({
-                    "y" : y,
-                    "x" : x,
-                    "delta_yaw" : center_delta_yaw
-                })
+            if abs(center[0]-320) < 100:
+                if stop_spinning:
+                    # Get accurate read
+                    center_point = get_average_of_nearby_pixels(pc, row, column)
+                    if center_point is None:
+                        print("Center point is none in point cloud")
+                        continue
+                    center_delta_x = center_point[0]
+                    center_delta_y = center_point[2]
+                    center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
+                    center_yaw = normalize_angle(current_yaw - center_delta_yaw)
+                    x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+                    found_centers_yaw.append(center_yaw)
+                    print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}")
+
+                    stop_spinning = False
+                elif not any([abs(center_yaw - x) < 0.2 for x in found_centers_yaw]):
+                    print("Stopping spinning")
+                    stop_spinning = True    # Robot will stop and wait for fresh pointcloud and rgb data
+                    continue
 
 
             # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
-            image = np.zeros(pc.shape[:2])
-
-            mask_depth = np.logical_and(pc[:, :, 2] > 0.3, pc[:, :, 2] < 3.0)
-            image[mask_depth] = np.int8(pc[:, :, 2][mask_depth] / 3.0 * 255)
 
             if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-                distance = center_point[2]
-                if not np.isnan(distance):
-                    cv2.putText(annotated_bgr,
-                                f"{distance:.2f} m, x={column:.2f},y={row:.2f}\npc={center_point}",
-                                (column - 40, row - 20),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5,
-                                (255, 255, 255),
-                                1)
+                if center_point:
+                    distance = center_point[2]
+                    if not np.isnan(distance):
+                        cv2.putText(annotated_bgr,
+                                    f"{distance:.2f} m, column={column:.2f},row={row:.2f}pc={center_point}",
+                                    (column - 40, row - 20),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.5,
+                                    (255, 255, 255),
+                                    1)
 
             cv2.imshow("RGB + Depth (DEBUG)", annotated_bgr.copy())
             cv2.waitKey(1)
