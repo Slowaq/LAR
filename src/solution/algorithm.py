@@ -439,10 +439,8 @@ class Algorithm:
         if not centers:
             print("Robot does not see left pillar")
             return False
-        # get the center closest to center
-        print(f"Unsorted: {centers}")
+        # get the center closest to center of camera
         centers.sort(key=lambda x: abs(x[0] - 320))
-        print(f"Sorted: {centers}")
         column, row = centers[0][1], centers[0][0]
         left_pillar = get_average_of_nearby_pixels(pc, column, row)
         if left_pillar is None:
@@ -481,10 +479,8 @@ class Algorithm:
         if not centers:
             print("Robot does not see right pillar")
             return False
-        # get the center closest to center
-        print(f"Unsorted: {centers}")
+        # get the center closest to center of camera
         centers.sort(key=lambda x: abs(x[0] - 320))
-        print(f"Sorted: {centers}")
         column, row = centers[0][1], centers[0][0]
         right_pillar = get_average_of_nearby_pixels(pc, column, row)
         if right_pillar is None:

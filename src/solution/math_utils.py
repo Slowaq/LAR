@@ -98,7 +98,7 @@ def multiply_vector(vec: tuple, multiplier: float) -> tuple:
     return (multiplier* vec[0], multiplier * vec[1])
 
 def normalize_vector(vec: tuple) -> tuple:
-    lenght = get_distance(*vec)
+    lenght = get_distance(vec, (0,0))
     return multiply_vector(vec, 1/lenght)
 
 def dot_product(vec1: tuple, vec2: tuple) -> float:
