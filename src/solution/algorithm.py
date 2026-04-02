@@ -414,13 +414,13 @@ class Algorithm:
                     print("Starting spinning")
                     stop_spinning = False
 
-                elif not any([abs(center_yaw - x) < 0.2 for x in found_centers_yaw]):
+                elif not any([abs(center_yaw - x) < 0.05 for x in found_centers_yaw]):
                     print("Stopping spinning")
                     stop_spinning = True    # Robot will stop and wait for fresh pointcloud and rgb data
                     continue
 
                 else:
-                    print(f"Not stopping for this - the closes center is {min([abs(center_yaw - x) < 0.2 for x in found_centers_yaw])}")
+                    print(f"Not stopping for this - the closes center is {min([abs(center_yaw - x) for x in found_centers_yaw])}")
             else:
                 print("Center is not in the middle of camera")
 
