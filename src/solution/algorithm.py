@@ -447,9 +447,9 @@ class Algorithm:
             return False
         
         odometry = self.robot.get_odometry()
-        left = found_centers[0][:2]
+        left = found_centers[1][:2]
         left_globaly = (left[1]+odometry[0], left[0]-odometry[1])
-        right = found_centers[1][:2]
+        right = found_centers[0][:2]
         right_globaly = (right[1]+odometry[0], right[0]-odometry[1])
 
 
@@ -459,9 +459,17 @@ class Algorithm:
         print(f"odometry: {odometry}")
         print(f"left globally: {left_globaly}")
         print(f"right globally: {right_globaly}")
+
         garage_gate = average_vector(left_globaly, right_globaly)
         print(f"garage_gate: {garage_gate}")
         self._go_to_point_using_odometry(*garage_gate)
+        left_to_right_angle = math.atan2(
+            right[0] - left[0],
+            right[1] - left[1]
+        )
+        print(f"target angle: {left_to_right_angle}")
+
+        self._rotate_to_angle(left_to_right_angle)
         return
 
 
