@@ -421,7 +421,7 @@ class Algorithm:
             # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
 
             if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-                if center_point:
+                if center_point is not None:
                     distance = center_point[2]
                     if not np.isnan(distance):
                         cv2.putText(annotated_bgr,
