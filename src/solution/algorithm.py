@@ -463,13 +463,17 @@ class Algorithm:
         garage_gate = average_vector(left_globaly, right_globaly)
         print(f"garage_gate: {garage_gate}")
         self._go_to_point_using_odometry(*garage_gate)
-        left_to_right_angle = math.atan2(
+        target_angle = math.atan2(
             right[0] - left[0],
             right[1] - left[1]
         ) + math.pi / 2
-        print(f"target angle: {left_to_right_angle}")
+        print(f"target angle: {target_angle}")
 
-        self._rotate_to_angle(left_to_right_angle)
+        # Make sure the robot is not facing the oposite direction
+        if abs(normalize_angle(target_angle - current_yaw)) > math.pi/2:
+            target_angle = normalize_angle(target_angle + math.pi)
+
+        self._rotate_to_angle(target_angle)
 
         # [6] Rotate towards garage
 
