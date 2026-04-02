@@ -102,4 +102,4 @@ def normalize_vector(vec: tuple) -> tuple:
     return multiply_vector(vec, 1/lenght)
 
 def dot_product(vec1: tuple, vec2: tuple) -> float:
-    return vec1[0] * vec2[0] + vec1[1] + vec2[1]
+    return vec1[0] * vec2[0] + vec1[1] * vec2[1]
