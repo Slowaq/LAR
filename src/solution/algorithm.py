@@ -408,7 +408,7 @@ class Algorithm:
                 
                 if stop_spinning:
                     # We have accurate read
-                    found_centers.append(x, y, center_yaw)
+                    found_centers.append((x, y, center_yaw))
                     pprint(found_centers)
                     print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw:.2f}")
                     print("Starting spinning")
