@@ -396,7 +396,7 @@ class Algorithm:
             column, row =  center[0], center[1]
             center_point = None
 
-            if abs(center[0]-320) < 100:
+            if abs(center[0]-320) < 100 or not stop_spinning:
                 center_point = get_average_of_nearby_pixels(pc, row, column)
                 if center_point is None:
                     print("Center point is none in point cloud")
@@ -421,7 +421,7 @@ class Algorithm:
                     continue
 
                 else:
-                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - center_delta_yaw - x) for x in found_centers_yaw])}")
+                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - center_delta_yaw - x) for x in found_centers_yaw]):.2f}")
             else:
                 print("Center is not in the middle of camera")
 
