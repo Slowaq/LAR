@@ -359,7 +359,7 @@ class Algorithm:
 
         # [1] Find the two purple pillars - do a circle
         while not self.robot.is_shutting_down() and not self.stop:
-            self.robot.cmd_velocity(0, ANGULAR_TO_THE_POINT)
+            # self.robot.cmd_velocity(0, 0.2)
             rgb_image = self.robot.get_rgb_image()
             pc = self.robot.get_point_cloud()
             odometry = self.robot.get_odometry()
@@ -379,6 +379,7 @@ class Algorithm:
             centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
 
             if not centers: 
+                print(f"No centers found")
                 continue
 
             # Focus only on the center that is in the middle of screen, because that is where depth camera is the most accurate
@@ -389,11 +390,12 @@ class Algorithm:
                 print("Center point is none in point cloud")
                 continue
             center_delta_x = center_point[0]
-            center_delta_z = center_point[2]
-            center_delta_yaw = math.atan2(center_delta_x, center_delta_z)
+            center_delta_y = center_point[2]
+            center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
             center_yaw = normalize_angle(current_yaw - center_delta_yaw)
-            x, y = rotate_vector(center_delta_x, center_delta_z, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+            x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
 
+            print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}")
             centers_data.append({
                 "y" : y,
                 "x" : x,
