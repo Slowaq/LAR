@@ -4,6 +4,7 @@ from .math_utils import *
 import numpy as np
 import cv2
 import math
+from pprint import pprint
 
 EXIT_ANGULAR_VELOCITY = 0.3
 DISTANCE_TOL = 0.085
@@ -370,8 +371,10 @@ class Algorithm:
 
             if left_origin and abs(normalize_angle(current_yaw -origin_yaw)) < 0.2:
                 print("Back at origin")
-                cv2.destroyAllWindows()
-                break
+                pprint(centers_data)
+                left_origin = False
+                # cv2.destroyAllWindows()
+                # break
 
             centers, annotated_bgr, frame_bw = find_purple_quads(rgb_image)
 
