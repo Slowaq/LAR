@@ -565,6 +565,7 @@ class Algorithm:
 
         target_point = local_coords_to_global(*target_point)
         print(f"Target point (global): { target_point}")
+        self._go_to_point_using_odometry(*target_point)
 
         input()
 
