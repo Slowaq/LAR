@@ -34,11 +34,11 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        # self.exit_garage()
+        self.exit_garage()
         self.robot.reset_odometry()
-        # self.approach_pylon()
+        self.approach_pylon()
         # self.drive_around_pylon()
-        self.return_to_garage()
+        # self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
