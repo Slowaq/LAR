@@ -20,7 +20,7 @@ FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
 LINEAR_PARKING_VELOCITY = 0.1
-PATH_AROUND_PYLON = [(0.2,  0.33), (0.70, 0.33), (0.70, -0.33), (0.2, -0.33)]
+PATH_AROUND_PYLON = [(0.2,  0.33), (0.75, 0.33), (0.75, -0.33), (0.2, -0.33)]
 
 class Algorithm:
     def __init__(self):
@@ -326,7 +326,7 @@ class Algorithm:
         The robot drives in front of the garage door. After this function, it should be enough
         to drive straight into the garage.
         """
-        if not self._go_to_point_using_odometry(0.3, 0):
+        if not self._go_to_point_using_odometry(0.2, 0):
             return False
         self.robot.wait_for_odometry()
         return self._rotate_to_angle(math.pi)
