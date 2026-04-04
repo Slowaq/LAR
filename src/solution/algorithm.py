@@ -4,6 +4,7 @@ from .math_utils import *
 import numpy as np
 import cv2
 import math
+import rospy
 from pprint import pprint
 from typing import Tuple, List
 
@@ -199,9 +200,7 @@ class Algorithm:
         """
         Finds the ball and drives to it to a certain distance.
         """
-        self.robot.wait_for_rgb_image()
-        self.robot.wait_for_point_cloud()
-        self.robot.wait_for_odometry()
+        self._wait_for_new_data()
 
         initial_yaw = self.robot.get_odometry()[2]
         left_origin = False
@@ -266,8 +265,7 @@ class Algorithm:
                 else:
                     print("Close enough to the target - confirming the pylon")
                     self.robot.cmd_velocity(0, 0)   # Wait for accurate reading
-                    self.robot.wait_for_rgb_image()
-                    self.robot.wait_for_point_cloud()
+                    self._wait_for_new_data()
                     rgb_image = self.robot.get_rgb_image()
                     pc = self.robot.get_point_cloud()
                     pylon, _, _ = find_pylon(rgb_image)
@@ -327,11 +325,8 @@ class Algorithm:
         """
         print("Driving around pylon using odometry")
 
-        self.robot.wait_for_odometry()
+        self._wait_for_odometry()
         start_odom = self.robot.get_odometry()
-        if start_odom is None:
-            print("Odometry is None")
-            return False
 
         start_x, start_y, start_phi = start_odom
 
@@ -383,9 +378,7 @@ class Algorithm:
             Returns an empty list if it does not find exactly 2 pillars.
         """
         print('Waiting for point cloud, RGB and odometry...')
-        self.robot.wait_for_point_cloud()
-        self.robot.wait_for_rgb_image()
-        self.robot.wait_for_odometry()
+        self._wait_for_new_data()
         print('First point cloud, RGB, and odometry received...')
 
         origin_yaw = self.robot.get_odometry()[2]
@@ -400,11 +393,9 @@ class Algorithm:
                 self.robot.cmd_velocity(0, 0.4)
             else:                
                 self.robot.cmd_velocity(0, 0)
-                self.robot.wait_for_point_cloud()
-                self.robot.wait_for_rgb_image()
-                self.robot.cmd_velocity(0, 0)
+                self._wait_for_new_data() # Robot should not be moving while waiting for point cloud
 
-            pc = self.robot.get_point_cloud()   # Robot should not be moving while waiting for point cloud
+            pc = self.robot.get_point_cloud()   
             rgb_image = self.robot.get_rgb_image()
             odometry = self.robot.get_odometry()
             current_yaw = odometry[2]
@@ -548,7 +539,7 @@ class Algorithm:
         """
         if not self._go_to_point_using_odometry(0, 0): # Get in front of garage approximately using odometry
             return False
-        self.robot.wait_for_odometry()
+        self._wait_for_odometry()
         return self._rotate_to_angle(math.pi)
 
     def drive_into_garage(self) -> bool:
@@ -568,11 +559,8 @@ class Algorithm:
 
         print("Parking into garage")
         self.robot.reset_odometry()
-        self.robot.wait_for_odometry()
-        self.robot.wait_for_point_cloud()
+        self._wait_for_new_data()  
 
-        # WARNING: The trailing commas here create tuples, not floats.
-        # This will likely cause a TypeError below when calculating desired_yaw.
         dest_x = 10        # Tell the robot to go straight
         dest_y = 0
         
@@ -637,7 +625,7 @@ class Algorithm:
         """
         Helper method. Drives given distance (in meters) forward using odometry.
         """
-        self.robot.wait_for_odometry()
+        self._wait_for_odometry()
         odometry = self.robot.get_odometry()
         target_point = local_coords_to_global_coords(0, distance, odometry) 
         return self._go_to_point_using_odometry(*target_point)
@@ -670,21 +658,12 @@ class Algorithm:
         """
         print(f"Rotaing by {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
 
-        self.robot.wait_for_odometry()
+        self._wait_for_odometry()
         start = self.robot.get_odometry()
-        if start is None:
-            # Shouldnt ever happen
-            print("Odometry is None")
-            return False
-
         start_yaw = start[2]
 
         while not self.robot.is_shutting_down() and not self.stop:
             odom = self.robot.get_odometry()
-            if odom is None:
-                # Shouldnt ever happen
-                print("Odometry is None")
-                continue
             if self.record_trajectory:
                 self.trajectory.append((odom[0], odom[1]))
 
@@ -727,7 +706,7 @@ class Algorithm:
         bool
             True if rotation completed successfully, False otherwise.
         """
-        self.robot.wait_for_odometry()
+        self._wait_for_odometry()
         odom = self.robot.get_odometry()
 
         if odom is None:
@@ -846,7 +825,7 @@ class Algorithm:
         """
         print(f"Driving to point: ({dest_x:.2f}, {dest_y:.2f})")
             
-        self.robot.wait_for_odometry()
+        self._wait_for_odometry()
         current_odom = self.robot.get_odometry()
         if current_odom is None:
             print("Odometry is None")
@@ -883,3 +862,39 @@ class Algorithm:
 
         print("Destination reached successfully!")
         return True
+    
+    def _wait_for_rgb_image(self) -> None:
+        """
+        Same as Turtlebot.wait_for_rgb_image() while also checking the self.stop flag.
+        """
+        self.robot.rgb_msg = None
+        while not (self.robot.has_rgb_image() or rospy.is_shutdown() or self.stop):
+            rospy.sleep(0.5)
+
+    def _wait_for_point_cloud(self) -> None:
+        """
+        Same as Turtlebot.wait_for_point_cloud() while also checking the self.stop flag.
+        """
+        self.robot.pc_msg = None
+        while not (self.robot.has_point_cloud() or rospy.is_shutdown() or self.stop):
+            rospy.sleep(0.5)
+
+    def _wait_for_odometry(self) -> None:
+        """
+        Same as Turtlebot.wait_for_odometry() while also checking the self.stop flag.
+        """
+        self.robot.odom = None
+        while not (self.robot.has_odometry() or rospy.is_shutdown() or self.stop):
+            rospy.sleep(0.5)
+
+    def _wait_for_new_data(self) -> None:
+        """
+        Waits for new set of rgb_image, point cloud and odometry data while also checking the self.stop flag. 
+        """
+        self.robot.rgb_msg = None
+        self.robot.pc_msg = None
+        self.robot.odom = None
+        has_new_data = False 
+        while not (has_new_data or rospy.is_shutdown() or self.stop):
+            rospy.sleep(0.5)
+            has_new_data = self.robot.has_odometry() and self.robot.has_rgb_image() and self.robot.has_point_cloud()
