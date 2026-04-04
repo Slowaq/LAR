@@ -136,6 +136,12 @@ def normalize_vector(vec: tuple) -> tuple:
 def dot_product(vec1: tuple, vec2: tuple) -> float:
     return vec1[0] * vec2[0] + vec1[1] * vec2[1]
 
+def extend_vector(vec: tuple, extension: float) -> tuple:
+    current_lenght = get_distance(vec, (0,0))
+    desired_lenght = current_lenght + extension
+    multiplier = desired_lenght / current_lenght
+    return multiply_vector(vec, multiplier)
+
 def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray) -> tuple:
     """
     pc_x is positive right of the robot

@@ -21,7 +21,8 @@ FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
 LINEAR_PARKING_VELOCITY = 0.05
-PATH_AROUND_PYLON = [(0,  0.35), (0.7, 0.35), (0.7, -0.35), (0, -0.35)]
+PATH_AROUND_PYLON = [(0.0,  0.35), (0.7, 0.35), (0.7, -0.35), (0.0, -0.35)]
+SEARCH_FOR_PYLON_PATH = [(0.0, 0.0), (1.5, 0), (3.0, 0)]
 
 class Algorithm:
     def __init__(self):
@@ -182,20 +183,32 @@ class Algorithm:
         """
         self._drive_forward(DISTANCE_OUT_OF_GARAGE)
         
-
     def approach_pylon(self) -> None:
+        for point in SEARCH_FOR_PYLON_PATH:
+            self._go_to_point_using_odometry(*point)
+
+            if self.look_for_pylon():
+                return True
+            else:
+                print("Couldnt find pylon from this position - trying different point")
+        print("Couldnt find pylon at all")
+        return False
+
+
+    def look_for_pylon(self) -> bool:
         """
         Finds the ball and drives to it to a certain distance.
         """
         self.robot.wait_for_rgb_image()
         self.robot.wait_for_point_cloud()
+        self.robot.wait_for_odometry()
 
-        TARGET_DISTANCE = 0.6  # 50 cm
+        initial_yaw = self.robot.get_odometry()[2]
+        left_origin = False
 
-        stoping = False
+        TARGET_DISTANCE = 0.6 
 
-
-        while not self.robot.is_shutting_down() and not self.stop and not stoping:
+        while not self.robot.is_shutting_down() and not self.stop:
             # --- RGB OBRAZ ---
             frame = self.robot.get_rgb_image()
             if frame is None:
@@ -207,6 +220,15 @@ class Algorithm:
             if pc is None:
                 print("Pointcloud is None")
                 continue
+
+            current_yaw = self.robot.get_odometry()[2]
+            if abs(normalize_angle(initial_yaw - current_yaw)) > 0.5:
+                left_origin = True
+
+            if left_origin and abs(normalize_angle(initial_yaw - current_yaw)) < 0.2:
+                print("Robot did full circle and couldnt find pylon")
+                cv2.destroyAllWindows()
+                return False
 
             image = np.zeros(pc.shape[:2])
 
@@ -240,13 +262,32 @@ class Algorithm:
                 print(f"distance: {distance:.2f}, x_pixel_error: {x_pixel_error:.2f}, target_distace: {TARGET_DISTANCE:.2f}")
                 if distance > TARGET_DISTANCE:
                     print("Going after target")
-                    linear = 0.05
+                    linear = 0.1
                 else:
-                    print("Close enough to the target - stopping")
-                    linear = 0.0  # zastav
-                    stoping = True
+                    print("Close enough to the target - confirming the pylon")
+                    self.robot.cmd_velocity(0, 0)   # Wait for accurate reading
+                    self.robot.wait_for_rgb_image()
+                    self.robot.wait_for_point_cloud()
+                    rgb_image = self.robot.get_rgb_image()
+                    pc = self.robot.get_point_cloud()
+                    pylon, _, _ = find_pylon(rgb_image)
 
-                        # debug info
+                    if pylon is not None:
+                        column, row = pylon
+                        pylon_pc = get_average_of_nearby_pixels(pc, row, column)
+                        if pylon_pc is not None:
+                            # mask_bgr = cv2.cvtColor(bw_mask, cv2.COLOR_GRAY2BGR)
+                            # combined = np.hstack((frame, mask_bgr))
+                            # while True:
+                            #     cv2.imshow("combined", combined)
+                            #     key = cv2.waitKey(1)
+                            #     if key == 27:
+                            #         break
+                            break
+                    else:
+                        print("ignoring halucination")
+                        angular = 0.3
+                        
                 cv2.putText(frame, f"dist: {distance:.2f} m",
                                     (column - 40, row - 20),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5,
@@ -265,24 +306,12 @@ class Algorithm:
             cv2.imshow("combined", combined)
             cv2.waitKey(1)
 
-        cv2.destroyAllWindows()
-
-        # Robot is stopped, wait for new data to get accurate reading of pylon position
-        self.robot.wait_for_rgb_image()
-        self.robot.wait_for_point_cloud()
-        rgb_image = self.robot.get_rgb_image()
-        pc = self.robot.get_point_cloud()
-        pylon, _, _ = find_pylon(rgb_image)
-        if pylon is not None:
-            column, row = pylon
-            pylon_pc = get_average_of_nearby_pixels(pc, row, column)
-        else:
-            print("The robot lost the pylon - using last known position")
-            # Failsafe - we lost the pylon, use latest know position
-
+        # cv2.destroyAllWindows()
         distance = pylon_pc[2]
         # We can drive a bit more forward, but the camera wont see the pylon anymore
         self._drive_forward(distance - 0.25) 
+        print("Robot successfully found and approached pylon")
+        return True
 
 
     def drive_around_pylon(self) -> bool:
@@ -489,6 +518,7 @@ class Algorithm:
             print(f"right globally: {pillar_2}")
 
             garage_gate = average_vector(pillar_1, pillar_2)
+            garage_gate = extend_vector(garage_gate, DISTANCE_TOL) # go a bit further to compensate for DISTANCE_TOL
             print(f"garage_gate: {garage_gate}")
             self._go_to_point_using_odometry(*garage_gate)
             target_angle = math.atan2(
@@ -823,6 +853,10 @@ class Algorithm:
             return False # Shouldnt ever happen
 
         current_x, current_y = current_odom[0], current_odom[1]
+        distance = get_distance((current_x, current_y), (dest_x, dest_y))
+        if distance < DISTANCE_TOL:
+            print("Already at the point")
+            return True
 
         current_yaw = current_odom[2]
 
