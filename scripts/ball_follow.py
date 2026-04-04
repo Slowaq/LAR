@@ -107,9 +107,9 @@ def main():
 def find_pylon(frame):
     frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
-
-    lower_green = np.array([35, 70, 70])
-    upper_green = np.array([85, 255, 255])
+    
+    lower_green = np.array([35, 60, 57])
+    upper_green = np.array([90, 245, 255])
 
     mask = cv2.inRange(hsv, lower_green, upper_green)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
@@ -119,23 +119,39 @@ def find_pylon(frame):
 
     if contours:
         cnt = max(contours, key=cv2.contourArea)
-        area = cv2.contourArea(cnt)
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            
 
-        if area > 300:
-            ((x, y), radius) = cv2.minEnclosingCircle(cnt)
-            x, y = int(x), int(y)
+            if area < 330 or area > 2000:
+                continue
 
-            width = frame.shape[1]
-            center_x = width // 2
-            error = x - center_x
+            perimeter = cv2.arcLength(cnt, True)
+            if perimeter == 0:
+                continue
 
-            # kreslenie
-            cv2.circle(frame_bgr, (x, y), int(radius), (0,255,0), 2)
-            cv2.circle(frame_bgr, (x, y), 3, (0,0,255), -1)
-            cv2.line(frame_bgr, (center_x, 0),
-                     (center_x, frame.shape[0]), (255,0,0), 2)
+            circularity = 4 * np.pi * area / (perimeter ** 2)
 
-            return error, x, y, frame_bgr
+            bx, by, w, h = cv2.boundingRect(cnt)
+            aspect_ratio = w / h
+
+            # pylon filters
+            if (circularity > 0.52 and
+                0.65 < aspect_ratio < 1.55):
+                ((x, y), radius) = cv2.minEnclosingCircle(cnt)
+                x, y = int(x), int(y)
+
+                width = frame.shape[1]
+                center_x = width // 2
+                error = x - center_x
+
+                cv2.circle(frame_bgr, (x, y), int(radius), (0,255,0), 2)
+                cv2.circle(frame_bgr, (x, y), 3, (0,0,255), -1)
+                cv2.line(frame_bgr, (center_x, 0),
+                        (center_x, frame.shape[0]), (255,0,0), 2)
+                
+                return error, x, y, frame_bgr
 
     return None, None, None, frame_bgr
 
