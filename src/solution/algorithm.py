@@ -272,12 +272,7 @@ class Algorithm:
                     else:
                         print("ignoring halucination")
                         angular = 0.4
-
-                cv2.putText(frame, f"dist: {distance:.2f} m",
-                                    (column - 40, row - 20),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                    (255,255,255), 1)
-
+                        
             # Nemame validni vzdalenost - tocime se na miste a hledame pylon
             else:
                 pass
