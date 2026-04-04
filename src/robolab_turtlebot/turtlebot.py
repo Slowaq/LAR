@@ -153,6 +153,9 @@ class Turtlebot(object):
             rospy.sleep(0.5)
 
     def get_odometry(self):
+        """
+        returns (x, y, phi)
+        """
         if self.odom:
             odom = np.zeros((3))
             odom[0] = self.odom.pose.pose.position.x

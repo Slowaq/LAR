@@ -1,21 +1,123 @@
 import numpy as np
 import cv2
+from typing import Tuple, Optional
 
-BALL_HSV_REFERENCE = np.array([74, 129, 110])
-HSV_TOLERANCES = np.array([10, 60, 60])
+CIRCULARITY_THRESHOLD = 0.45
 
-def find_ball_segments(hsv: np.ndarray) -> np.ndarray:
-    # Compute absolute differences for H, and thresholds for S and V
-    h_diff = np.abs(hsv[:, :, 0].astype(int) - BALL_HSV_REFERENCE[0])
-    s_mask = hsv[:, :, 1] > HSV_TOLERANCES[1]
-    v_mask = hsv[:, :, 2] > HSV_TOLERANCES[2]
+def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]:
+    frame_bgr = frame.copy()
+    hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
-    print(f"pixel HSV (362, 382) is {hsv[382, 362, :]}")
+    lower_green = np.array([37, 70, 35])
+    upper_green = np.array([80, 255, 255])
 
-    # Combine all conditions
-    mask = (h_diff < HSV_TOLERANCES[0]) & s_mask & v_mask
+    # create a mask for green color and discard noise
+    mask = cv2.inRange(hsv, lower_green, upper_green)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5,5), np.uint8))
 
-    # Convert to uint8 black-and-white image
-    bw_image = mask.astype(np.uint8) * 255
-    print(f"pixel BW (362, 382) is {bw_image[382, 362]}")
-    return bw_image
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    target_coords = None
+
+    if contours:
+        # sort contours by area from largest to smallest
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+        
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area < 100:
+                continue
+
+            
+            # check circularity(roundness) of the contour
+            perimeter = cv2.arcLength(cnt, True)
+            circularity = 4 * np.pi * area / (perimeter * perimeter) if perimeter > 0 else 0
+            
+            if circularity < CIRCULARITY_THRESHOLD:
+                continue
+            
+            ((x, y), radius) = cv2.minEnclosingCircle(cnt)
+            x, y = int(x), int(y)
+
+            # Save the coordinates of the largest contour (the first one processed)
+            if target_coords is None:
+                cv2.circle(frame_bgr, (x, y), 3, (0,0,255), -1)  
+                target_coords = (x, y)
+
+            # kreslenie - draw bounding circle and center for EVERY contour
+            cv2.circle(frame_bgr, (x, y), int(radius), (0,255,0), 2)
+            
+            # Put text next to the object with area (A) and circularity (C)
+            label = f"A:{area:.0f} C:{circularity:.2f}"
+            cv2.putText(frame_bgr, label, (x + 10, y + 10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+    # Return the target coordinates (if any were found), the drawn frame, and the mask
+    return target_coords, frame_bgr, mask
+
+
+def find_purple_quads(frame_bgr):
+    """
+    centers i a list of tuples of (column, row)
+    """
+    hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
+
+    lower_purple = np.array([111, 80, 60])
+    upper_purple = np.array([145, 255, 255])
+
+    mask = cv2.inRange(hsv, lower_purple, upper_purple)
+
+    # Clean mask
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
+    frame_bw = mask.copy()
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    detected = []
+    centers = []
+
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        if area < 600:
+            continue
+
+        # 1. Solidity Check: area of contour / area of convex hull
+        # Rectangles should have high solidity (close to 1.0)
+        hull = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull)
+        solidity = float(area) / hull_area if hull_area > 0 else 0
+        if solidity < 0.8: # Filter out "hollow" or complex shapes
+            continue
+
+        # 2. Aspect Ratio Check
+        _, _, w, h = cv2.boundingRect(cnt)
+        aspect_ratio = float(w) / h
+        # Wh expect tall rectangles
+        if aspect_ratio > 0.5: 
+            continue
+
+        # Compute 4-point bounding box
+        rect = cv2.minAreaRect(cnt)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        detected.append(box)
+
+        # Compute center using moments of the original contour
+        M = cv2.moments(cnt)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+            centers.append((cx, cy))
+        else:
+            centers.append((int(rect[0][0]), int(rect[0][1])))  # fallback
+
+    centers.sort(key=lambda x: abs(x[0] - 320))
+
+    # Draw detected quads
+    for poly, (cx, cy) in zip(detected, centers):
+        cv2.drawContours(frame_bgr, [poly], -1, (0, 255, 0), 2)
+        cv2.circle(frame_bgr, (cx, cy), 4, (0, 0, 255), -1)
+
+    return centers, frame_bgr, frame_bw
