@@ -1,13 +1,5 @@
-import cv2, os
-import numpy as np
-import scipy.io
-import matplotlib.pyplot as plt
-from time import sleep
-
+from robolab_turtlebot import sleep
 from src.solution import Algorithm, register_callbacks
-
-from sys import argv
-
 
 def main() -> None:
     algorithm = Algorithm()
