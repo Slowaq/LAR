@@ -77,7 +77,7 @@ def register_callbacks(algorithm: Algorithm) -> None:
             msg (ButtonMsgMock): Incoming button event message.
         """
         if msg.state == STATE_PRESSED:
-            if msg.button == BUTTON_B0:
+            if msg.button == BUTTON_B0 and not algorithm.is_running:
                 print("Button B0 pressed - starting execution")
                 algorithm.run()
             elif msg.button == BUTTON_B1:

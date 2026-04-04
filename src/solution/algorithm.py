@@ -9,7 +9,7 @@ from typing import Tuple, List
 
 EXIT_ANGULAR_VELOCITY = 0.3
 DISTANCE_TOL = 0.085
-SPEED_TO_THE_POINT = 0.3
+SPEED_TO_THE_POINT = 0.2
 ANGULAR_TO_THE_POINT = 0.9
 ANGULAR_TO_THE_POINT_CLAMP = 0.7
 MINIMAL_ANGULAR_VELOCITY = 0.2
@@ -21,12 +21,13 @@ FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
 LINEAR_PARKING_VELOCITY = 0.05
-PATH_AROUND_PYLON = [(0.2,  0.33), (0.75, 0.33), (0.75, -0.33), (0.2, -0.33)]
+PATH_AROUND_PYLON = [(0,  0.35), (0.7, 0.35), (0.7, -0.35), (0, -0.35)]
 
 class Algorithm:
     def __init__(self):
         self.robot = Turtlebot(rgb=True, depth=True, pc=True)
         self.stop : bool = False    # When a bumper hits something or a button is pressed, the robot stops. 
+        self.is_running : bool = False  # Blocks B0 from starting another run
         self.record_trajectory : bool = False   # If true, the robot's trajectory will be stored in self.trajectory 
         self.trajectory = []   # Used for storing the trajectory of the robot for debugging purposes. Not used in the algorithm itself.
 
@@ -36,6 +37,7 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
+        self.is_running = True
         self.exit_garage()        
         self.approach_pylon()
         self.drive_around_pylon()
@@ -46,6 +48,7 @@ class Algorithm:
         else:
             self.robot.play_sound()
             print("Algorithm successfully finished")
+        self.is_running = False
 
     def exit_garage(self) -> bool:
         """
@@ -185,10 +188,7 @@ class Algorithm:
         Finds the ball and drives to it to a certain distance.
         """
         self.robot.wait_for_rgb_image()
-
-
-
-        RESPONSE = 0.003
+        self.robot.wait_for_point_cloud()
 
         TARGET_DISTANCE = 0.6  # 50 cm
 
@@ -214,48 +214,41 @@ class Algorithm:
 
             image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
 
-            depth_vis = cv2.applyColorMap(
-                255 - image.astype(np.uint8),
-                cv2.COLORMAP_JET
-            )     # used only for visualization
-
             linear = 0.0
             angular = 0.0
+            distance = None
                     
-            error, x, y, frame = find_pylon(frame)
+            pylon, frame, bw_mask = find_pylon(frame)
                     
-            if error is None:
+            if pylon is None:
                 angular = 0.3  # hľadanie objektu
             else:
-                angular = -KP_ANG_PIXELS * error
+                column, row = pylon[0], pylon[1]
+                pylon_pc = get_average_of_nearby_pixels(pc, row, column)
+                if pylon_pc is None:
+                    angular = 0.3
+                else:
+                    x_pixel_error = column - 320                       
+                    distance = pylon_pc[2]     
+                    angular = -x_pixel_error * 0.001
+                    angular = min(max(angular, -0.3), 0.3)
                 
-
-            # --- ZÍSKANIE VZDIALENOSTI Z POINT CLOUDU ---
-
-            if x is not None and y is not None: 
-                distance = pc[y, x, 2]  # Z = vzdialenosť dopredu, pc.shape = (480, 640, 3)
-            else:
-                distance = None
 
             # ak máme validnú vzdialenosť
             if distance is not None and not np.isnan(distance):
                 # riadenie dopredného pohybu    
-                print(f"distance: {distance:.2f}, target_distace: {TARGET_DISTANCE:.2f}")
+                print(f"distance: {distance:.2f}, x_pixel_error: {x_pixel_error:.2f}, target_distace: {TARGET_DISTANCE:.2f}")
                 if distance > TARGET_DISTANCE:
-                    if abs(error) < 100:
-                        print("Going after target")
-                        linear = 0.1    # jedem dopredu
-                    else:
-                        print("Angular error is too large - turning on the spot")
-                        linear = 0.0    # jenom otaceni
+                    print("Going after target")
+                    linear = 0.05
                 else:
-                        print("Close enough to the target - stopping")
-                        linear = 0.0  # zastav
-                        stoping = True
+                    print("Close enough to the target - stopping")
+                    linear = 0.0  # zastav
+                    stoping = True
 
                         # debug info
                 cv2.putText(frame, f"dist: {distance:.2f} m",
-                                    (x - 40, y - 20),
+                                    (column - 40, row - 20),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5,
                                     (255,255,255), 1)
                 
@@ -267,11 +260,30 @@ class Algorithm:
             print(f"linear={linear:.2f}, angular={angular:.2f}\n")
             self.robot.cmd_velocity(linear=linear, angular=angular)
 
-            combined = np.hstack((frame, depth_vis))
+            mask_bgr = cv2.cvtColor(bw_mask, cv2.COLOR_GRAY2BGR)
+            combined = np.hstack((frame, mask_bgr))
             cv2.imshow("combined", combined)
             cv2.waitKey(1)
 
         cv2.destroyAllWindows()
+
+        # Robot is stopped, wait for new data to get accurate reading of pylon position
+        self.robot.wait_for_rgb_image()
+        self.robot.wait_for_point_cloud()
+        rgb_image = self.robot.get_rgb_image()
+        pc = self.robot.get_point_cloud()
+        pylon, _, _ = find_pylon(rgb_image)
+        if pylon is not None:
+            column, row = pylon
+            pylon_pc = get_average_of_nearby_pixels(pc, row, column)
+        else:
+            print("The robot lost the pylon - using last known position")
+            # Failsafe - we lost the pylon, use latest know position
+
+        distance = pylon_pc[2]
+        # We can drive a bit more forward, but the camera wont see the pylon anymore
+        self._drive_forward(distance - 0.25) 
+
 
     def drive_around_pylon(self) -> bool:
         """
