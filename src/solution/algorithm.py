@@ -45,6 +45,7 @@ class Algorithm:
         if self.stop:
             print("Algorithm exited early")
         else:
+            self.robot.play_sound()
             print("Algorithm successfully finished")
 
     def exit_garage(self) -> None:
