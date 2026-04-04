@@ -51,18 +51,16 @@ class Algorithm:
             print("Algorithm successfully finished")
         self.is_running = False
 
-    def exit_garage(self) -> bool:
+    def exit_garage(self) -> None:
         """
         The robot orients itself and exits the garage.
         Resets odometry outside of garage.
         """
         if self.find_exit():
             self.drive_out_of_garage()
-            self.robot.reset_odometry()
-            return True
+            self.robot.reset_odometry()          
         else:
-            print("Could not find the garage exit!")
-            return False
+            print("Could not find the garage exit!")         
 
     def find_exit(self) -> bool:
         """
@@ -89,11 +87,7 @@ class Algorithm:
         print('First point cloud recieved ...')
 
         print("Finding exit")
-        while not self.robot.is_shutting_down():
-            if self.stop:   
-                self.robot.cmd_velocity(0, 0)
-                return False
-
+        while not self._is_stopping():
             # get point cloud
             pc = self.robot.get_point_cloud()
 
@@ -170,6 +164,7 @@ class Algorithm:
                 print("Exit found!")
                 return True
 
+        self.robot.cmd_velocity(0, 0)
         return False
 
     def drive_out_of_garage(self) -> None:
@@ -206,7 +201,7 @@ class Algorithm:
 
         TARGET_DISTANCE = 0.6 
 
-        while not self.robot.is_shutting_down() and not self.stop:
+        while not self._is_stopping():
             # --- RGB OBRAZ ---
             frame = self.robot.get_rgb_image()
             if frame is None:
@@ -387,7 +382,7 @@ class Algorithm:
 
         # Do a circle and find purple pillars
         # If the robot sees a purple pillar, it stops moving to get more accurate data
-        while not self.robot.is_shutting_down() and not self.stop:
+        while not self._is_stopping():
             if not stop_spinning: 
                 self.robot.cmd_velocity(0, 0.4)
             else:                
@@ -563,11 +558,7 @@ class Algorithm:
         dest_x = 10        # Tell the robot to go straight
         dest_y = 0
         
-        while not self.robot.is_shutting_down():
-            if self.stop:   
-                self.robot.cmd_velocity(0, 0)
-                return False
-
+        while not self._is_stopping():
             current = self.robot.get_odometry()
             pc = self.robot.get_point_cloud()
             if current is None or pc is None:
@@ -618,6 +609,7 @@ class Algorithm:
                 print("Parked into garage!")
                 return True
 
+        self.robot.cmd_velocity(0, 0)
         return False
 
     def _drive_forward(self, distance: float) -> bool:
@@ -661,7 +653,7 @@ class Algorithm:
         start = self.robot.get_odometry()
         start_yaw = start[2]
 
-        while not self.robot.is_shutting_down() and not self.stop:
+        while not self._is_stopping():
             odom = self.robot.get_odometry()
             if self.record_trajectory:
                 self.trajectory.append((odom[0], odom[1]))
@@ -750,11 +742,7 @@ class Algorithm:
         """
         print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
 
-        while not self.robot.is_shutting_down():
-            if self.stop:   
-                self.robot.cmd_velocity(0, 0)
-                return False
-
+        while not self._is_stopping():
             self._wait_for_odometry()
             current = self.robot.get_odometry()
             if current is None:
@@ -792,6 +780,7 @@ class Algorithm:
 
             self.robot.cmd_velocity(linear, angular)
 
+        self.robot.cmd_velocity(0, 0)
         return False
 
     def _go_to_point_using_odometry(self, dest_x: float, dest_y: float) -> bool:
@@ -824,9 +813,6 @@ class Algorithm:
             
         self._wait_for_odometry()
         current_odom = self.robot.get_odometry()
-        if current_odom is None:
-            print("Odometry is None")
-            return False # Shouldnt ever happen
 
         current_x, current_y = current_odom[0], current_odom[1]
         distance = get_distance((current_x, current_y), (dest_x, dest_y))
@@ -865,7 +851,7 @@ class Algorithm:
         Same as Turtlebot.wait_for_rgb_image() while also checking the self.stop flag.
         """
         self.robot.rgb_msg = None
-        while not (self.robot.has_rgb_image() or self.robot.is_shutting_down() or self.stop):
+        while not (self.robot.has_rgb_image() or self._is_stopping()):
             sleep(0.5)
 
     def _wait_for_point_cloud(self) -> None:
@@ -873,7 +859,7 @@ class Algorithm:
         Same as Turtlebot.wait_for_point_cloud() while also checking the self.stop flag.
         """
         self.robot.pc_msg = None
-        while not (self.robot.has_point_cloud() or self.robot.is_shutting_down() or self.stop):
+        while not (self.robot.has_point_cloud() or self._is_stopping()):
             sleep(0.5)
 
     def _wait_for_odometry(self) -> None:
@@ -881,7 +867,7 @@ class Algorithm:
         Same as Turtlebot.wait_for_odometry() while also checking the self.stop flag.
         """
         self.robot.odom = None
-        while not (self.robot.has_odometry() or self.robot.is_shutting_down() or self.stop):
+        while not (self.robot.has_odometry() or self._is_stopping()):
             sleep(0.5)
 
     def _wait_for_new_data(self) -> None:
@@ -892,6 +878,12 @@ class Algorithm:
         self.robot.pc_msg = None
         self.robot.odom = None
         has_new_data = False 
-        while not (has_new_data or self.robot.is_shutting_down() or self.stop):
+        while not (has_new_data or self._is_stopping()):
             sleep(0.5)
             has_new_data = self.robot.has_odometry() and self.robot.has_rgb_image() and self.robot.has_point_cloud()
+
+    def _is_stopping(self) -> bool:
+        """
+        Returns True if ROS is shutting down or self.stop flag is true.
+        """
+        return self.robot.is_shutting_down() or self.stop
