@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 import math
 from pprint import pprint
+from typing import Tuple, List
 
 EXIT_ANGULAR_VELOCITY = 0.3
 DISTANCE_TOL = 0.085
@@ -304,60 +305,39 @@ class Algorithm:
 
         return True
     
-    def return_to_garage(self) -> None:
+    def return_to_garage(self) -> bool:
         """
         The robot finds the garage door, drives in front of it, and then parks inside the garage.
         """
         print("returning to garage")
         if not self.approach_garage():
             print("Failed to approach garage")
-            return
+            return False
+        if not self.find_garage_entrance():
+            print("Couldnt find garage entrance")
+            return False
         if not self.drive_into_garage():
             print("Failed to park into garage")
-
-    def find_garage_entrance(self) -> None:
-        """
-        The robot turns towards the garage entrance.
-        """
-        pass
-
-    def approach_garage(self) -> bool:
-        """
-        The robot drives in front of the garage door. After this function, it should be enough
-        to drive straight into the garage.
-        """
-        if not self._go_to_point_using_odometry(0.0, 0):
             return False
-        self.robot.wait_for_odometry()
-        return self._rotate_to_angle(math.pi)
+        return True
 
-    def drive_into_garage(self) -> bool:
+    def find_garage_pillars(self) -> List[Tuple[float, float]]:
         """
-        This method uses point cloud data to drive straight into the garage until it is close enough to the wall.
-        Neccesary condittion is that the robot is already in between garage pillars and facing the wall. 
-
-        Returns
-        -------
-            bool: True if successfully parked, False if interrupted or failed.
+        TODO
         """
-        print(f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall.")
-
         print('Waiting for point cloud, RGB and odometry...')
         self.robot.wait_for_point_cloud()
         self.robot.wait_for_rgb_image()
         self.robot.wait_for_odometry()
         print('First point cloud, RGB and odometry recieved recieved ...')
 
-        # TODO: najit pilire, brat v potaz to, ze aby hloubka byla presna, tak musi robot
-        # byt natocen k piliri primo. Pilir nesmi byt na okraji obrazovky - vznika chyba.
-        # Podle piliru dopocitat bod, na ose mezi piliri pred garazi a dojet tam a natocit se presne do garaze 
-
         origin_yaw = self.robot.get_odometry()[2]
         left_origin = False
-        found_centers = []
+        found_pillars = []
         stop_spinning = False
 
-        # [1] Find the two purple pillars - do a circle
+        # [1] Do a circle and find purple pillars
+        # If the robot sees purple pillar, it stops moving to get more accurate data
         while not self.robot.is_shutting_down() and not self.stop:
             if not stop_spinning: 
                 self.robot.cmd_velocity(0, 0.4)
@@ -381,57 +361,56 @@ class Algorithm:
                 cv2.destroyAllWindows()
                 break
 
-            centers, annotated_bgr, bw_image = find_purple_quads(rgb_image)
+            pillars, annotated_bgr, bw_image = find_purple_quads(rgb_image)
 
-            if not centers: 
+            if not pillars: 
                 print(f"No centers found")
                 continue
 
             # Focus only on the center that is in the middle of screen, because that is where depth camera is the most accurate
-            centers.sort(key=lambda x: abs(x[0] - 320))
-            center = centers[0]
-            column, row =  center[0], center[1]
-            center_point = None
+            pillars.sort(key=lambda x: abs(x[0] - 320))
+            center_of_pillar = pillars[0]
+            column, row =  center_of_pillar[0], center_of_pillar[1]
+            pillar_pc = None
 
-            if abs(center[0]-320) < 100 or stop_spinning:
-                center_point = get_average_of_nearby_pixels(pc, row, column)
-                if center_point is None:
+            if abs(column-320) < 100 or stop_spinning:
+                pillar_pc = get_average_of_nearby_pixels(pc, row, column)
+                if pillar_pc is None:
                     print("Center point is none in point cloud")
                     continue
-                center_delta_x = center_point[0]
-                center_delta_y = center_point[2]
-                center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
-                center_yaw = normalize_angle(current_yaw - center_delta_yaw)
-                x, y = rotate_vector(center_delta_x, center_delta_y, current_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+                delta_x = pillar_pc[0]
+                delta_y = pillar_pc[2]
+                delta_yaw = math.atan2(delta_x, delta_y)
+                center_yaw = normalize_angle(current_yaw - delta_yaw)       # minus because of flipped y axis compared to global system 
+                x, y = rotate_vector(delta_x, delta_y, current_yaw)         # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
                 print(f"Robot position: x_glob={odometry[0]:.3f} y_glob={odometry[1]:.3f}")
-                global_x, global_y = y + odometry[0], odometry[1] - x           # global x is in front of the robot and global t is to the left of the robot
+                global_x, global_y = y + odometry[0], odometry[1] - x       # global x is in front of the robot and global t is to the left of the robot
                 
                 if stop_spinning:
                     # We have accurate read
-                    found_centers.append((global_x, global_y, center_yaw))
-                    pprint(found_centers)
-                    print(f"dx={center_delta_x:.3f}, dy={center_delta_y:.3f}, dyaw={center_delta_yaw:.3f}, yaw={center_yaw:.3f}, x={x:.3f}, y={y:.3f}, robot_yaw={current_yaw:.3f}, glob_x={global_x:.3}, glob_y={global_y:.3f}",)
+                    found_pillars.append((global_x, global_y, center_yaw))
+                    print(f"dx={delta_x:.3f}, dy={delta_y:.3f}, dyaw={delta_yaw:.3f}, yaw={center_yaw:.3f}, x={x:.3f}, y={y:.3f}, robot_yaw={current_yaw:.3f}, glob_x={global_x:.3}, glob_y={global_y:.3f}",)
                     # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
 
-                    if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-                        if center_point is not None:
-                            cv2.putText(annotated_bgr,
-                                        "XXX",
-                                        (column, row),
-                                        cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.5,
-                                        (255, 255, 255),
-                                        1)
-                            cv2.putText(annotated_bgr,
-                                        f"column={column}, row={row}, delta_x={center_delta_x:.2f}, delta_y={center_delta_y:.2f}",
-                                        (20,20),
-                                        cv2.FONT_HERSHEY_SIMPLEX,
-                                        0.5,
-                                        (255, 255, 255),
-                                        1)
+                    # if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
+                    #     if center_point is not None:
+                    #         cv2.putText(annotated_bgr,
+                    #                     "XXX",
+                    #                     (column, row),
+                    #                     cv2.FONT_HERSHEY_SIMPLEX,
+                    #                     0.5,
+                    #                     (255, 255, 255),
+                    #                     1)
+                    #         cv2.putText(annotated_bgr,
+                    #                     f"column={column}, row={row}, delta_x={center_delta_x:.2f}, delta_y={center_delta_y:.2f}",
+                    #                     (20,20),
+                    #                     cv2.FONT_HERSHEY_SIMPLEX,
+                    #                     0.5,
+                    #                     (255, 255, 255),
+                    #                     1)
                             
-                    bw_bgr = cv2.cvtColor(bw_image, cv2.COLOR_GRAY2BGR)
-                    combined_view = np.hstack((annotated_bgr, bw_bgr))
+                    # bw_bgr = cv2.cvtColor(bw_image, cv2.COLOR_GRAY2BGR)
+                    # combined_view = np.hstack((annotated_bgr, bw_bgr))
 
                     # while True:
                     #     cv2.imshow("RGB + threshold mask (DEBUG)", combined_view.copy())
@@ -443,47 +422,81 @@ class Algorithm:
                     print("Starting spinning")
                     stop_spinning = False
 
-                elif not any([abs((current_yaw - center_delta_yaw) - x[2]) < 0.2 for x in found_centers]):
+                # Ignore pillars we have already seen
+                elif not any([abs((current_yaw - delta_yaw) - x[2]) < 0.3 for x in found_pillars]):
                     print("Stopping spinning")
                     stop_spinning = True    # Robot will stop and wait for fresh pointcloud and rgb data
                     continue
 
                 else:
-                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - center_delta_yaw - x[2]) for x in found_centers]):.2f}")
+                    print(f"Not stopping for this - the closest center is {min([abs(current_yaw - delta_yaw - x[2]) for x in found_pillars]):.2f}")
             else:
                 print("Center is not in the middle of camera")
 
+        if len(found_pillars) == 2:
+            return found_pillars
+        else:
+            print(f"Found {len(found_pillars)} instead of 2")
+            return []
 
 
-
-        print(f"found centers:")
-        pprint(found_centers)
-        if len(found_centers) != 2:
-            print(f"Found {len(found_centers)} purple pillars, not 2")
-            return False
+    def find_garage_entrance(self) -> bool:
+        """
+        The robot finds garage entrance, drives between the two purple pillars and rotates into garage.
+        """
+        print("Looking for garage entrance")
         
-        pillar_1 = found_centers[1][:2]
-        pillar_2 = found_centers[0][:2]
+        pillars = self.find_garage_pillars()
+        if pillars:
 
-        # [4] get garage midpoint (everything is already at global coordinate space)
-        print(f"left globally: {pillar_1}")
-        print(f"right globally: {pillar_2}")
+            pillar_1 = pillars[1][:2]
+            pillar_2 = pillars[0][:2]
 
-        garage_gate = average_vector(pillar_1, pillar_2)
-        print(f"garage_gate: {garage_gate}")
-        self._go_to_point_using_odometry(*garage_gate)
-        target_angle = math.atan2(
-            pillar_2[0] - pillar_1[0],
-            pillar_2[1] - pillar_1[1]
-        )
+            # [4] get garage midpoint (everything is already at global coordinate space)
+            print(f"left globally: {pillar_1}")
+            print(f"right globally: {pillar_2}")
 
-        # Make sure the robot is not facing the oposite direction
-        if abs(normalize_angle(target_angle - current_yaw)) > math.pi/2:
-            target_angle = normalize_angle(target_angle + math.pi)
+            garage_gate = average_vector(pillar_1, pillar_2)
+            print(f"garage_gate: {garage_gate}")
+            self._go_to_point_using_odometry(*garage_gate)
+            target_angle = math.atan2(
+                pillar_2[0] - pillar_1[0],
+                pillar_2[1] - pillar_1[1]
+            )
 
-        print(f"target angle: {target_angle}")
-        self._rotate_to_angle(target_angle)
+            # Make sure the robot is not facing the oposite direction
+            current_yaw = self.robot.get_odometry()[2]
+            if abs(normalize_angle(target_angle - current_yaw)) > math.pi/2:
+                target_angle = normalize_angle(target_angle + math.pi)
+        else:
+            # Failsafe if finding pillars fails
+            target_angle = math.pi
+            
+        print(f"target angle: {target_angle:.3f}")
+        return self._rotate_to_angle(target_angle)
 
+    def approach_garage(self) -> bool:
+        """
+        The robot drives in front of the garage door. After this function, it should be enough
+        to drive straight into the garage.
+        """
+        if not self._go_to_point_using_odometry(0.0, 0):
+            return False
+        self.robot.wait_for_odometry()
+        return self._rotate_to_angle(math.pi)
+
+    def drive_into_garage(self) -> bool:
+        """
+        This method uses point cloud data to drive straight into the garage until it is close enough to the wall.
+        Neccesary condittion is that the robot is already in between garage pillars and facing the wall. 
+
+        Returns
+        -------
+            bool: True if successfully parked, False if interrupted or failed.
+        """
+        print(f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall.")
+
+        
         # [6] Rotate towards garage
 
         # Predpokladame, ze robot stoji na ose mezi fialovymi piliri
