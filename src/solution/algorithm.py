@@ -2,9 +2,7 @@ from robolab_turtlebot import Turtlebot, sleep
 from .segmentation import find_pylon, find_purple_quads
 from .math_utils import *
 import numpy as np
-import cv2
 import math
-from pprint import pprint
 from typing import Tuple, List
 
 EXIT_ANGULAR_VELOCITY = 0.3
@@ -214,8 +212,7 @@ class Algorithm:
                 left_origin = True
 
             if left_origin and abs(normalize_angle(initial_yaw - current_yaw)) < 0.2:
-                print("Robot did full circle and couldnt find pylon")
-                cv2.destroyAllWindows()
+                print("Robot did full circle and couldnt find pylon")             
                 return False
 
             image = np.zeros(pc.shape[:2])
@@ -263,14 +260,6 @@ class Algorithm:
                         column, row = pylon
                         pylon_pc = get_average_of_nearby_pixels(pc, row, column)
                         if pylon_pc is not None:
-                            # mask_bgr = cv2.cvtColor(bw_mask, cv2.COLOR_GRAY2BGR)
-                            # combined = np.hstack((frame, mask_bgr))
-                            # while True:
-                            #     cv2.imshow("combined", combined)
-                            #     key = cv2.waitKey(1)
-                            #     if key == 27:
-                            #         break
-                            cv2.destroyAllWindows()
                             distance = pylon_pc[2]
                             # We can drive a bit more forward, but the camera wont see the pylon anymore
                             if not self._drive_forward(distance - 0.25):
@@ -281,11 +270,6 @@ class Algorithm:
                     else:
                         print("ignoring halucination")
                         angular = 0.3
-                        
-                cv2.putText(frame, f"dist: {distance:.2f} m",
-                                    (column - 40, row - 20),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                                    (255,255,255), 1)
                 
             # Nemame validni vzdalenost - tocime se na miste a hledame pylon
             else:
@@ -295,12 +279,7 @@ class Algorithm:
             print(f"linear={linear:.2f}, angular={angular:.2f}\n")
             self.robot.cmd_velocity(linear=linear, angular=angular)
 
-            mask_bgr = cv2.cvtColor(bw_mask, cv2.COLOR_GRAY2BGR)
-            combined = np.hstack((frame, mask_bgr))
-            cv2.imshow("combined", combined)
-            cv2.waitKey(1)
-            # End while - robot was interrupted
-
+        # End while - robot was interrupted
         return False
 
 
@@ -389,17 +368,13 @@ class Algorithm:
 
             if not left_origin and abs(normalize_angle(current_yaw - origin_yaw)) > 0.5:
                 left_origin = True
-                print("Left origin")
 
-            if left_origin and abs(normalize_angle(current_yaw - origin_yaw)) < 0.2:
-                print("Back at origin")
-                cv2.destroyAllWindows()
+            if left_origin and abs(normalize_angle(current_yaw - origin_yaw)) < 0.2:    
                 break
 
-            pillars, annotated_bgr, bw_image = find_purple_quads(rgb_image)
+            pillars, _, _ = find_purple_quads(rgb_image)
 
             if not pillars: 
-                print(f"No pillars found")
                 continue
 
             # Focus only on the center that is in the middle of the screen, as the depth camera is most accurate there
@@ -412,49 +387,16 @@ class Algorithm:
                 pillar_pc = get_average_of_nearby_pixels(pc, row, column)
                 if pillar_pc is None:
                     print("Pillar center point is None in point cloud")
-                    continue
+                    return []
                 delta_x = pillar_pc[0]
                 delta_y = pillar_pc[2]
                 delta_yaw = math.atan2(delta_x, delta_y)
                 center_yaw = normalize_angle(current_yaw - delta_yaw)       # Minus because of flipped y-axis compared to global system 
-                x, y = rotate_vector(delta_x, delta_y, current_yaw)         # x is right of the robot and y is in front, assuming robot heading is yaw = 0
-                print(f"Robot position: x_glob={odometry[0]:.3f} y_glob={odometry[1]:.3f}")
                 global_x, global_y = local_coords_to_global_coords(delta_x, delta_y, odometry)       # Global x is in front of the robot and global y is to the left
                 
                 if stop_spinning:
                     # We have an accurate read
-                    found_pillars.append((global_x, global_y, center_yaw))
-                    print(f"dx={delta_x:.3f}, dy={delta_y:.3f}, dyaw={delta_yaw:.3f}, yaw={center_yaw:.3f}, x={x:.3f}, y={y:.3f}, robot_yaw={current_yaw:.3f}, glob_x={global_x:.3}, glob_y={global_y:.3f}")
-                    # --- VISUALIZATION ---   
-                    # TODO: Remove this block - debugging visualization only
-
-                    # if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-                    #     if center_point is not None:
-                    #         cv2.putText(annotated_bgr,
-                    #                     "XXX",
-                    #                     (column, row),
-                    #                     cv2.FONT_HERSHEY_SIMPLEX,
-                    #                     0.5,
-                    #                     (255, 255, 255),
-                    #                     1)
-                    #         cv2.putText(annotated_bgr,
-                    #                     f"column={column}, row={row}, delta_x={center_delta_x:.2f}, delta_y={center_delta_y:.2f}",
-                    #                     (20,20),
-                    #                     cv2.FONT_HERSHEY_SIMPLEX,
-                    #                     0.5,
-                    #                     (255, 255, 255),
-                    #                     1)
-                            
-                    # bw_bgr = cv2.cvtColor(bw_image, cv2.COLOR_GRAY2BGR)
-                    # combined_view = np.hstack((annotated_bgr, bw_bgr))
-
-                    # while True:
-                    #     cv2.imshow("RGB + threshold mask (DEBUG)", combined_view.copy())
-                    #     key = cv2.waitKey(1)
-                    #     if key == 27: #esc
-                    #         cv2.destroyAllWindows()
-                    #         break                   
-
+                    found_pillars.append((global_x, global_y, center_yaw))                    
                     stop_spinning = False
 
                 # Ignore pillars we have already seen
@@ -462,10 +404,6 @@ class Algorithm:
                     stop_spinning = True    # Robot will stop and wait for fresh point cloud and RGB data
                     continue
 
-                else:
-                    print(f"Not stopping for this pillar - the closest center is {min([abs(current_yaw - delta_yaw - x[2]) for x in found_pillars]):.2f}")
-            else:
-                print("Center is not in the middle of the camera")
 
         if len(found_pillars) == 2:
             return found_pillars
