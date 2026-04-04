@@ -135,3 +135,17 @@ def normalize_vector(vec: tuple) -> tuple:
 
 def dot_product(vec1: tuple, vec2: tuple) -> float:
     return vec1[0] * vec2[0] + vec1[1] * vec2[1]
+
+def pointcloud_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray) -> tuple:
+    """
+    pc_x is positive right of the robot
+    pc_y is positive in front of the robot
+    returns (global_x, global_y), where global x is positive forward and y is positive to the left
+    """
+    
+    robot_yaw = odometry[2]
+    robot_global_x, robot_global_y = odometry[0], odometry[1]
+    x_rotated, y_rotated =  rotate_vector(pc_x, pc_y, -robot_yaw)
+    point_global_x = robot_global_x + y_rotated
+    point_global_y = robot_global_y - x_rotated     # sign changes
+    return point_global_x, point_global_y

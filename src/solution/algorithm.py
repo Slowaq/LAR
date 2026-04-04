@@ -15,7 +15,7 @@ MINIMAL_ANGULAR_VELOCITY = 0.2
 KP_ANG = 5.0   # proportional gain for heading correction, proportional to angle error in radians
 KP_ANG_PIXELS = 0.003 # proportional gain for heading correction, proportional to angle error pixels
 DISTANCE_OUT_OF_GARAGE = 0.5 # [m] how far should the robot drive out ouf the garade in the exit_garage() method
-GARAGE_WALL_DISTANCE = 0.40 # [m] distance from the wall when parking into garage
+GARAGE_WALL_DISTANCE = 0.38 # [m] distance from the wall when parking into garage
 FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
@@ -49,10 +49,10 @@ class Algorithm:
         """
         The robot orients itself and exits the garage.
         """
-        if self.find_exit():
-            self.drive_out_of_garage()
-        else:
-            print("Could not find the garage exit!")
+        # if self.find_exit():
+        self.drive_out_of_garage()
+        # else:
+        #     print("Could not find the garage exit!")
 
     def find_exit(self) -> bool:
         """
@@ -326,7 +326,7 @@ class Algorithm:
         The robot drives in front of the garage door. After this function, it should be enough
         to drive straight into the garage.
         """
-        if not self._go_to_point_using_odometry(0.2, 0):
+        if not self._go_to_point_using_odometry(0.0, 0):
             return False
         self.robot.wait_for_odometry()
         return self._rotate_to_angle(math.pi)
@@ -381,7 +381,7 @@ class Algorithm:
                 cv2.destroyAllWindows()
                 break
 
-            centers, annotated_bgr, _ = find_purple_quads(rgb_image)
+            centers, annotated_bgr, bw_image = find_purple_quads(rgb_image)
 
             if not centers: 
                 print(f"No centers found")
@@ -402,13 +402,44 @@ class Algorithm:
                 center_delta_y = center_point[2]
                 center_delta_yaw = math.atan2(center_delta_x, center_delta_y)
                 center_yaw = normalize_angle(current_yaw - center_delta_yaw)
-                x, y = rotate_vector(center_delta_x, center_delta_y, -center_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+                x, y = rotate_vector(center_delta_x, center_delta_y, current_yaw)       # x is right of the robot and y is in front of the robot, assuming robot is heading at yaw = 0
+                print(f"Robot position: x_glob={odometry[0]:.3f} y_glob={odometry[1]:.3f}")
+                global_x, global_y = y + odometry[0], odometry[1] - x           # global x is in front of the robot and global t is to the left of the robot
                 
                 if stop_spinning:
                     # We have accurate read
-                    found_centers.append((x, y, center_yaw))
+                    found_centers.append((global_x, global_y, center_yaw))
                     pprint(found_centers)
-                    print(f"dx={center_delta_x:.2f}, dy={center_delta_y:.2f}, dyaw={center_delta_yaw:.2f}, yaw={center_yaw:.2f}, x={x:.2f}, y={y:.2f}, robot_yaw={current_yaw:.2f}")
+                    print(f"dx={center_delta_x:.3f}, dy={center_delta_y:.3f}, dyaw={center_delta_yaw:.3f}, yaw={center_yaw:.3f}, x={x:.3f}, y={y:.3f}, robot_yaw={current_yaw:.3f}, glob_x={global_x:.3}, glob_y={global_y:.3f}",)
+                    # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
+
+                    if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
+                        if center_point is not None:
+                            cv2.putText(annotated_bgr,
+                                        "XXX",
+                                        (column, row),
+                                        cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.5,
+                                        (255, 255, 255),
+                                        1)
+                            cv2.putText(annotated_bgr,
+                                        f"column={column}, row={row}, delta_x={center_delta_x:.2f}, delta_y={center_delta_y:.2f}",
+                                        (20,20),
+                                        cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.5,
+                                        (255, 255, 255),
+                                        1)
+                            
+                    bw_bgr = cv2.cvtColor(bw_image, cv2.COLOR_GRAY2BGR)
+                    combined_view = np.hstack((annotated_bgr, bw_bgr))
+
+                    # while True:
+                    #     cv2.imshow("RGB + threshold mask (DEBUG)", combined_view.copy())
+                    #     key = cv2.waitKey(1)
+                    #     if key == 27: #esc
+                    #         cv2.destroyAllWindows()
+                    #         break                   
+
                     print("Starting spinning")
                     stop_spinning = False
 
@@ -423,22 +454,7 @@ class Algorithm:
                 print("Center is not in the middle of camera")
 
 
-            # # --- VISUALIZATION ---   # TODO remove ts - debugging visualisation only
 
-            # if 0 <= row < pc.shape[0] and 0 <= column < pc.shape[1]:
-            #     if center_point is not None:
-            #         distance = center_point[2]
-            #         if not np.isnan(distance):
-            #             cv2.putText(annotated_bgr,
-            #                         f"{distance:.2f} m, column={column:.2f},row={row:.2f}pc={center_point}",
-            #                         (column - 40, row - 20),
-            #                         cv2.FONT_HERSHEY_SIMPLEX,
-            #                         0.5,
-            #                         (255, 255, 255),
-            #                         1)
-
-            # cv2.imshow("RGB + Depth (DEBUG)", annotated_bgr.copy())
-            # cv2.waitKey(1)
 
         print(f"found centers:")
         pprint(found_centers)
@@ -446,33 +462,26 @@ class Algorithm:
             print(f"Found {len(found_centers)} purple pillars, not 2")
             return False
         
-        odometry = self.robot.get_odometry()
-        left = found_centers[1][:2]
-        left_globaly = (left[1]+odometry[0], left[0]-odometry[1])
-        right = found_centers[0][:2]
-        right_globaly = (right[1]+odometry[0], right[0]-odometry[1])
+        pillar_1 = found_centers[1][:2]
+        pillar_2 = found_centers[0][:2]
 
+        # [4] get garage midpoint (everything is already at global coordinate space)
+        print(f"left globally: {pillar_1}")
+        print(f"right globally: {pillar_2}")
 
-        # [4] get garage midpoint (everything is relative to robot
-        print(f"left localy: {left}")
-        print(f"right localy: {right}")
-        print(f"odometry: {odometry}")
-        print(f"left globally: {left_globaly}")
-        print(f"right globally: {right_globaly}")
-
-        garage_gate = average_vector(left_globaly, right_globaly)
+        garage_gate = average_vector(pillar_1, pillar_2)
         print(f"garage_gate: {garage_gate}")
         self._go_to_point_using_odometry(*garage_gate)
         target_angle = math.atan2(
-            right[0] - left[0],
-            right[1] - left[1]
-        ) + math.pi / 2
-        print(f"target angle: {target_angle}")
+            pillar_2[0] - pillar_1[0],
+            pillar_2[1] - pillar_1[1]
+        )
 
         # Make sure the robot is not facing the oposite direction
         if abs(normalize_angle(target_angle - current_yaw)) > math.pi/2:
             target_angle = normalize_angle(target_angle + math.pi)
 
+        print(f"target angle: {target_angle}")
         self._rotate_to_angle(target_angle)
 
         # [6] Rotate towards garage
@@ -532,7 +541,7 @@ class Algorithm:
             angular = KP_ANG * angle_error
             angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # Clamp
 
-            self.robot.cmd_velocity(0.05, angular)
+            self.robot.cmd_velocity(0.03, angular)  # drive super slow, because we are recieving pc data slowly
 
             print(f"Distance: {dist:.2f}, thres: {GARAGE_WALL_DISTANCE:.2f}")
             if dist > GARAGE_WALL_DISTANCE:
