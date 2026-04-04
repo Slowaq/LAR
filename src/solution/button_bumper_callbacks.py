@@ -1,5 +1,5 @@
 from .algorithm import Algorithm
-from dataclasses import dataclass
+from kobuki_msgs.msg import ButtonEvent, BumperEvent
 
 STATE_RELEASED = 0
 STATE_PRESSED = 1
@@ -11,33 +11,6 @@ BUMPER_RIGHT = 2
 BUTTON_B0 = 0
 BUTTON_B1 = 1
 BUTTON_B2 = 2
-
-# TODO - use proper class msg class instead of a mock
-@dataclass
-class BumperMsgMock:
-    """
-    Mock message representing a bumper event.
-
-    Attributes:
-        bumper (int): Identifier of the bumper that triggered the event
-            (e.g., BUMPER_LEFT, BUMPER_CENTER, BUMPER_RIGHT).
-        state (int): State of the bumper (STATE_PRESSED or STATE_RELEASED).
-    """
-    bumper: int
-    state: int
-
-@dataclass
-class ButtonMsgMock:
-    """
-    Mock message representing a button event.
-
-    Attributes:
-        button (int): Identifier of the button that triggered the event
-            (e.g., BUTTON_B0, BUTTON_B1, BUTTON_B2).
-        state (int): State of the button (STATE_PRESSED or STATE_RELEASED).
-    """
-    button: int
-    state: int
 
 def register_callbacks(algorithm: Algorithm) -> None:
     """
@@ -53,7 +26,7 @@ def register_callbacks(algorithm: Algorithm) -> None:
             is controlled via robot input events.
     """
 
-    def _bumper_cb(msg: BumperMsgMock) -> None:
+    def _bumper_cb(msg: BumperEvent) -> None:
         """
         Handle bumper events.
 
@@ -62,11 +35,11 @@ def register_callbacks(algorithm: Algorithm) -> None:
         Args:
             msg (BumperMsgMock): Incoming bumper event message.
         """
-        if msg.state == STATE_PRESSED:
+        if msg.state == STATE_PRESSED and not algorithm.stop:
             print("Bumper pressed - stopping execution")
             algorithm.stop = True
 
-    def _button_cb(msg: ButtonMsgMock) -> None:
+    def _button_cb(msg: ButtonEvent) -> None:
         """
         Handle button events.
 
@@ -77,10 +50,10 @@ def register_callbacks(algorithm: Algorithm) -> None:
             msg (ButtonMsgMock): Incoming button event message.
         """
         if msg.state == STATE_PRESSED:
-            if msg.button == BUTTON_B0 and not algorithm.is_running:
+            if msg.button == BUTTON_B0 and algorithm.stop:  # Only when the robot is inactive
                 print("Button B0 pressed - starting execution")
                 algorithm.run()
-            elif msg.button == BUTTON_B1:
+            elif msg.button == BUTTON_B1 and not algorithm.stop:
                 print("Button B1 pressed - stopping execution")
                 algorithm.stop = True
 
