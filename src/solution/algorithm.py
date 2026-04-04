@@ -36,8 +36,7 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False
-        self.exit_garage()
-        self.robot.reset_odometry()
+        self.exit_garage()        
         self.approach_pylon()
         self.drive_around_pylon()
         self.return_to_garage()
@@ -48,14 +47,18 @@ class Algorithm:
             self.robot.play_sound()
             print("Algorithm successfully finished")
 
-    def exit_garage(self) -> None:
+    def exit_garage(self) -> bool:
         """
         The robot orients itself and exits the garage.
+        Resets odometry outside of garage.
         """
-        # if self.find_exit():
-        self.drive_out_of_garage()
-        # else:
-        #     print("Could not find the garage exit!")
+        if self.find_exit():
+            self.drive_out_of_garage()
+            self.robot.reset_odometry()
+            return True
+        else:
+            print("Could not find the garage exit!")
+            return False
 
     def find_exit(self) -> bool:
         """
@@ -174,9 +177,7 @@ class Algorithm:
         -------
             None
         """
-
-        self.robot.reset_odometry()
-        self._go_to_point_using_odometry(DISTANCE_OUT_OF_GARAGE, 0)
+        self._drive_forward(DISTANCE_OUT_OF_GARAGE)
         
 
     def approach_pylon(self) -> None:
@@ -399,7 +400,7 @@ class Algorithm:
                 center_yaw = normalize_angle(current_yaw - delta_yaw)       # Minus because of flipped y-axis compared to global system 
                 x, y = rotate_vector(delta_x, delta_y, current_yaw)         # x is right of the robot and y is in front, assuming robot heading is yaw = 0
                 print(f"Robot position: x_glob={odometry[0]:.3f} y_glob={odometry[1]:.3f}")
-                global_x, global_y = y + odometry[0], odometry[1] - x       # Global x is in front of the robot and global y is to the left
+                global_x, global_y = local_coords_to_global_coords(delta_x, delta_y, odometry)       # Global x is in front of the robot and global y is to the left
                 
                 if stop_spinning:
                     # We have an accurate read
@@ -590,11 +591,14 @@ class Algorithm:
 
         return False
 
-    def _drive_forward(self) -> None:
+    def _drive_forward(self, distance: float) -> bool:
         """
-        Helper method. Local wrapper around self.robot.cmd_velocity(). Checks the self.stop flag.
+        Helper method. Drives given distance (in meters) forward using odometry.
         """
-        pass
+        self.robot.wait_for_odometry()
+        odometry = self.robot.get_odometry()
+        target_point = local_coords_to_global_coords(0, distance, odometry) 
+        return self._go_to_point_using_odometry(*target_point)
 
     
     def _rotate_by_angle(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
