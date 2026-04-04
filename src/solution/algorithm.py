@@ -1,10 +1,9 @@
-from robolab_turtlebot import Turtlebot
+from robolab_turtlebot import Turtlebot, sleep
 from .segmentation import find_pylon, find_purple_quads
 from .math_utils import *
 import numpy as np
 import cv2
 import math
-import rospy
 from pprint import pprint
 from typing import Tuple, List
 
@@ -756,9 +755,7 @@ class Algorithm:
                 self.robot.cmd_velocity(0, 0)
                 return False
 
-            # wait for odometry
-            cv2.waitKey(10)
-
+            self._wait_for_odometry()
             current = self.robot.get_odometry()
             if current is None:
                 continue
@@ -868,24 +865,24 @@ class Algorithm:
         Same as Turtlebot.wait_for_rgb_image() while also checking the self.stop flag.
         """
         self.robot.rgb_msg = None
-        while not (self.robot.has_rgb_image() or rospy.is_shutdown() or self.stop):
-            rospy.sleep(0.5)
+        while not (self.robot.has_rgb_image() or self.robot.is_shutting_down() or self.stop):
+            sleep(0.5)
 
     def _wait_for_point_cloud(self) -> None:
         """
         Same as Turtlebot.wait_for_point_cloud() while also checking the self.stop flag.
         """
         self.robot.pc_msg = None
-        while not (self.robot.has_point_cloud() or rospy.is_shutdown() or self.stop):
-            rospy.sleep(0.5)
+        while not (self.robot.has_point_cloud() or self.robot.is_shutting_down() or self.stop):
+            sleep(0.5)
 
     def _wait_for_odometry(self) -> None:
         """
         Same as Turtlebot.wait_for_odometry() while also checking the self.stop flag.
         """
         self.robot.odom = None
-        while not (self.robot.has_odometry() or rospy.is_shutdown() or self.stop):
-            rospy.sleep(0.5)
+        while not (self.robot.has_odometry() or self.robot.is_shutting_down() or self.stop):
+            sleep(0.5)
 
     def _wait_for_new_data(self) -> None:
         """
@@ -895,6 +892,6 @@ class Algorithm:
         self.robot.pc_msg = None
         self.robot.odom = None
         has_new_data = False 
-        while not (has_new_data or rospy.is_shutdown() or self.stop):
-            rospy.sleep(0.5)
+        while not (has_new_data or self.robot.is_shutting_down() or self.stop):
+            sleep(0.5)
             has_new_data = self.robot.has_odometry() and self.robot.has_rgb_image() and self.robot.has_point_cloud()
