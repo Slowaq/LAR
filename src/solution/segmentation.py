@@ -51,6 +51,9 @@ def find_pylon(frame: np.ndarray):
     return None, None, None, frame_bgr
 
 def find_purple_quads(frame_bgr):
+    """
+    centers i a list of tuples of (column, row)
+    """
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
     lower_purple = np.array([111, 80, 60])
@@ -60,7 +63,7 @@ def find_purple_quads(frame_bgr):
 
     # Clean mask
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((10, 10), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     frame_bw = mask.copy()
 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -70,7 +73,22 @@ def find_purple_quads(frame_bgr):
 
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        if area < 300:
+        if area < 600:
+            continue
+
+        # 1. Solidity Check: area of contour / area of convex hull
+        # Rectangles should have high solidity (close to 1.0)
+        hull = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull)
+        solidity = float(area) / hull_area if hull_area > 0 else 0
+        if solidity < 0.8: # Filter out "hollow" or complex shapes
+            continue
+
+        # 2. Aspect Ratio Check
+        _, _, w, h = cv2.boundingRect(cnt)
+        aspect_ratio = float(w) / h
+        # Wh expect tall rectangles
+        if aspect_ratio > 0.5: 
             continue
 
         # Compute 4-point bounding box
@@ -88,7 +106,7 @@ def find_purple_quads(frame_bgr):
         else:
             centers.append((int(rect[0][0]), int(rect[0][1])))  # fallback
 
-    centers.sort(key=lambda x: x[0])
+    centers.sort(key=lambda x: abs(x[0] - 320))
 
     # Draw detected quads
     for poly, (cx, cy) in zip(detected, centers):
