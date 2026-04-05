@@ -24,6 +24,9 @@ def register_callbacks(algorithm: Algorithm) -> None:
     Args:
         algorithm (Algorithm): The algorithm instance whose execution
             is controlled via robot input events.
+
+    Returns:
+        None
     """
 
     def _bumper_cb(msg: BumperEvent) -> None:
@@ -33,7 +36,10 @@ def register_callbacks(algorithm: Algorithm) -> None:
         Stops the algorithm when any bumper is pressed.
 
         Args:
-            msg (BumperMsgMock): Incoming bumper event message.
+            msg (BumperEvent): Incoming bumper event message.
+
+        Returns:
+            None
         """
         if msg.state == STATE_PRESSED and not algorithm.stop:
             print("Bumper pressed - stopping execution")
@@ -47,7 +53,10 @@ def register_callbacks(algorithm: Algorithm) -> None:
         - BUTTON_B1 press stops the algorithm.
 
         Args:
-            msg (ButtonMsgMock): Incoming button event message.
+            msg (ButtonEvent): Incoming button event message.
+
+        Returns:
+            None
         """
         if msg.state == STATE_PRESSED:
             if msg.button == BUTTON_B0 and algorithm.stop:  # Only when the robot is inactive

@@ -31,17 +31,22 @@ SEARCH_FOR_PYLON_PATH = [(0.6, 0)] + [
 PYLON_TARGET_DISTANCE = 0.8
 
 class Algorithm:
-    def __init__(self):
-        self.robot = Turtlebot(rgb=True, depth=True, pc=True)
-        self.stop : bool = True         # When a bumper hits something or a button is pressed, the robot stops.When false, block B0 from starting another execution
-        self.record_trajectory : bool = False   # If true, the robot's trajectory will be stored in self.trajectory
-        self.trajectory = []   # Used for storing the trajectory of the robot for debugging purposes. Not used in the algorithm itself.
-        self.points_visited = []
+    def __init__(self) -> None:
+        self.robot: Turtlebot = Turtlebot(rgb=True, depth=True, pc=True)
+        self.stop: bool = True  # When a bumper hits something or a button is pressed, the robot stops.
+        self.record_trajectory: bool = False  # If true, the robot's trajectory is stored in self.trajectory.
+        self.trajectory: List[Tuple[float, float]] = []  # Used for storing the trajectory of the robot for debugging purposes.
+        self.points_visited: List[Tuple[float, float]] = []
 
     def run(self) -> None:
         """
-        This function defines the instruction pipeline for the robot, from starting the program
-        to successfully parking in the garage.
+        Execute the full parking algorithm pipeline.
+
+        The method resets the robot state, exits the garage, searches for the pylon,
+        drives around it, and then returns the robot to the garage.
+
+        Returns:
+            None
         """
         self.stop = False  
         self.points_visited = []    
@@ -60,8 +65,13 @@ class Algorithm:
 
     def exit_garage(self) -> None:
         """
-        The robot orients itself to exit the garage.
-        Resets odometry in the middle of garage.
+        Orient the robot and exit the garage.
+
+        The method attempts to find the exit direction and resets odometry once
+        the exit has been detected.
+
+        Returns:
+            None
         """
         if self.find_exit():
             self.robot.reset_odometry()          
@@ -70,17 +80,15 @@ class Algorithm:
 
     def find_exit(self) -> bool:
         """
-        Rotate robot to the center of the garage's exit using point cloud data.
+        Find and align the robot with the garage exit.
 
-        The function analyzes the depth point cloud and estimates the
-        distance to obstacles in front of the robot. Calculates the angle of the exit
-        by detecting when the wall ends and when it appears again.
+        The method rotates while analyzing depth point cloud data to detect an
+        open passage between walls. Once the exit direction is determined, it
+        rotates toward that heading and stops.
 
-        Returns
-        -------
-        bool
-            True if a suitable exit direction was found.
-            False interupted before detection.
+        Returns:
+            bool: True if a suitable exit direction was found, False if the
+                operation was interrupted or the exit was not located.
         """
 
 
@@ -170,6 +178,16 @@ class Algorithm:
         return False
         
     def approach_pylon(self) -> None:
+        """
+        Visit predefined search points and attempt to detect the pylon.
+
+        The robot drives sequentially to points on the search path and scans for
+        the pylon from each location. If the pylon is found at any point, the
+        method returns early.
+
+        Returns:
+            None
+        """
         for point in SEARCH_FOR_PYLON_PATH:
             if not self._go_to_point_using_odometry(*point):
                 print(f"Driving to point ({point[0]:.2f}, {point[1]:.2f}) failed")
@@ -184,7 +202,15 @@ class Algorithm:
 
     def look_for_pylon(self) -> bool:
         """
-        Finds the ball and drives to it to a certain distance.
+        Locate the pylon and approach it using vision and point cloud data.
+
+        The method uses RGB detection to find the pylon, then refines the
+        position with point cloud averaging. It drives toward the pylon until
+        a target distance is reached.
+
+        Returns:
+            bool: True if the pylon was successfully located and approached,
+                False if the robot was interrupted or the pylon was not found.
         """
         self._wait_for_new_data()
 
@@ -336,14 +362,13 @@ class Algorithm:
 
     def drive_around_pylon(self) -> None:
         """
-        Hardcoded maneuver to drive around the pylon using odometry feedback.
-        The robot drives in a rectangle around the pylon and then returns to the starting point.
+        Execute a hardcoded maneuver around the pylon using odometry.
 
-        Starting point: 28cm (TODO find exact number) in front of the pylon, centered.
+        The robot drives in a rectangular path around the pylon after it has
+        been located, then returns to the start of the local maneuver.
 
-        Returns
-        -------
-            bool: True if successfully drove around the pylon, False if interrupted or failed.
+        Returns:
+            None
         """
         print("Driving around pylon using odometry")
 
@@ -370,7 +395,7 @@ class Algorithm:
         and drives inside to park.
 
         Returns:
-            bool: True if the entire parking sequence is successful, False otherwise.
+            None
         """
         print("returning to garage")
         if not self.approach_garage():
@@ -608,6 +633,9 @@ class Algorithm:
     def _drive_forward(self, distance: float) -> bool:
         """
         Helper method. Drives given distance (in meters) forward using odometry.
+
+        Returns:
+            bool: True if the forward drive completed, False if interrupted.
         """
         self._wait_for_odometry()
         odometry = self.robot.get_odometry()
@@ -849,7 +877,10 @@ class Algorithm:
     
     def _wait_for_rgb_image(self) -> None:
         """
-        Same as Turtlebot.wait_for_rgb_image() while also checking the self.stop flag.
+        Wait for a fresh RGB image while respecting the stop flag.
+
+        Returns:
+            None
         """
         self.robot.rgb_msg = None
         while not (self.robot.has_rgb_image() or self._is_stopping()):
@@ -857,7 +888,10 @@ class Algorithm:
 
     def _wait_for_point_cloud(self) -> None:
         """
-        Same as Turtlebot.wait_for_point_cloud() while also checking the self.stop flag.
+        Wait for a fresh point cloud while respecting the stop flag.
+
+        Returns:
+            None
         """
         self.robot.pc_msg = None
         while not (self.robot.has_point_cloud() or self._is_stopping()):
@@ -865,7 +899,10 @@ class Algorithm:
 
     def _wait_for_odometry(self) -> None:
         """
-        Same as Turtlebot.wait_for_odometry() while also checking the self.stop flag.
+        Wait for fresh odometry data while respecting the stop flag.
+
+        Returns:
+            None
         """
         self.robot.odom = None
         while not (self.robot.has_odometry() or self._is_stopping()):
@@ -873,7 +910,13 @@ class Algorithm:
 
     def _wait_for_new_data(self) -> None:
         """
-        Waits for new set of rgb_image, point cloud and odometry data while also checking the self.stop flag. 
+        Wait for a new set of RGB, point cloud, and odometry data.
+
+        The method clears the cached sensor messages and blocks until all
+        three data sources are available or the stop flag becomes true.
+
+        Returns:
+            None
         """
         self.robot.rgb_msg = None
         self.robot.pc_msg = None
@@ -885,6 +928,9 @@ class Algorithm:
 
     def _is_stopping(self) -> bool:
         """
-        Returns True if ROS is shutting down or self.stop flag is true.
+        Check whether execution should stop.
+
+        Returns:
+            bool: True if ROS is shutting down or the self.stop flag is set.
         """
         return self.robot.is_shutting_down() or self.stop

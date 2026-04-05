@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-from typing import Tuple, Optional
+from typing import List, Optional, Tuple
 
 CIRCULARITY_THRESHOLD = 0.52
 ASPECT_RATIO_LOWER_THRESHOLD = 0.65
@@ -10,6 +10,19 @@ ASPECT_RATIO_STRICT_UPPER_THRESHOLD = 1.25
 
 
 def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]:
+    """
+    Detect the green pylon in an RGB frame.
+
+    Args:
+        frame (np.ndarray): BGR image from the robot's camera.
+
+    Returns:
+        tuple:
+            Optional[Tuple[int, int]]: pixel coordinates (column, row) of the
+                detected pylon center, or None if no pylon was found.
+            np.ndarray: visualization image with overlays drawn.
+            np.ndarray: binary mask used for the green detection.
+    """
     frame_bgr = frame.copy()
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
     
@@ -80,9 +93,19 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
     # Return the target coordinates (if any were found), the drawn frame, and the mask
     return target_coords, frame_bgr, mask
 
-def find_purple_quads(frame_bgr):
+def find_purple_quads(frame_bgr: np.ndarray) -> Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]:
     """
-    centers i a list of tuples of (column, row)
+    Detect purple rectangular quads in a BGR frame.
+
+    Args:
+        frame_bgr (np.ndarray): BGR image from the robot's camera.
+
+    Returns:
+        tuple:
+            List[Tuple[int, int]]: ordered list of quad center coordinates
+                as (column, row).
+            np.ndarray: annotated BGR image showing detections.
+            np.ndarray: binary mask of detected purple regions.
     """
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
