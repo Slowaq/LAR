@@ -1,19 +1,20 @@
 import math
 import numpy as np
-from typing import Tuple, List, Optional
+from typing import Tuple, Optional
 
-def get_average_of_nearby_pixels(pc, y, x, window_size=5):
+def get_average_of_nearby_pixels(pc: np.ndarray, y: int, x: int, window_size: int = 5) -> Optional[np.ndarray]:
     """
     Compute the average 3D point in a window around (y, x), filtering out
     points further than 0.1 from the center pixel (or middle column).
 
     Args:
-        pc: HxWx3 point cloud (numpy array)
-        y, x: pixel coordinates, row, column (int)
-        window_size: odd number (default 5 for 5x5 window)
+        pc (np.ndarray): HxWx3 point cloud array.
+        y (int): Pixel row coordinate.
+        x (int): Pixel column coordinate.
+        window_size (int, optional): Odd number defining the window size. Defaults to 5.
 
     Returns:
-        np.array([x, y, z]) average or None if no valid points found
+        Optional[np.ndarray]: An array representing the [x, y, z] average, or None if no valid points are found.
     """
     half_w = window_size // 2
     h, w, _ = pc.shape
@@ -74,42 +75,44 @@ def get_average_of_nearby_pixels(pc, y, x, window_size=5):
 
     return np.mean(filtered_points, axis=0)
 
-def get_distance(point1: list, point2: list) -> float:
+def get_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
     """
-    Calculate distance from two 2D points.
+    Calculate the Euclidean distance between two 2D points.
 
-    Parameters
-    -------
-        point1: 2D point with coords [x,y]
+    Args:
+        point1 (Tuple[float, float]): The first 2D point [x, y].
+        point2 (Tuple[float, float]): The second 2D point [x, y].
 
-        point2: 2D point with coords [x,y]
-
-    Returns
-    -------
-        flaot: square root of distance of point1 and point2
+    Returns:
+        float: The square root of the distance between point1 and point2.
     """
-
     dx = point1[0] - point2[0]
     dy = point1[1] - point2[1]
-    return math.hypot(dx,dy)
+    return math.hypot(dx, dy)
 
 def normalize_angle(angle: float) -> float:
     """
-    Normalizes angle to [-pi, pi).
+    Normalizes an angle to the range [-pi, pi).
 
-    Returns
-    -------
-        float: normalized angle in range [-pi,pi)
+    Args:
+        angle (float): The input angle in radians.
+
+    Returns:
+        float: The normalized angle in the range [-pi, pi).
     """
     return (angle + math.pi) % (2 * math.pi) - math.pi
 
-
-def rotate_vector(x, y, phi):
+def rotate_vector(x: float, y: float, phi: float) -> Tuple[float, float]:
     """
-    Rotate a 2D vector (x, y) counterclockwise by angle phi (radians).
+    Rotate a 2D vector (x, y) counterclockwise by an angle phi.
+
+    Args:
+        x (float): The x-coordinate of the vector.
+        y (float): The y-coordinate of the vector.
+        phi (float): The angle of rotation in radians.
 
     Returns:
-        (x_new, y_new): tuple of rotated coordinates
+        Tuple[float, float]: The rotated coordinates (x_new, y_new).
     """
     cos_phi = math.cos(phi)
     sin_phi = math.sin(phi)
@@ -119,80 +122,131 @@ def rotate_vector(x, y, phi):
     
     return x_new, y_new
 
-def average_vector(vec1: tuple, vec2: tuple) -> tuple:
-    return ((vec1[0] + vec2[0])/2, (vec1[1] + vec2[1])/2)
+def average_vector(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tuple[float, float]:
+    """
+    Calculate the mathematical average of two 2D vectors.
 
-def substract_vectors(vec1: tuple, vec2: tuple) -> tuple:
+    Args:
+        vec1 (Tuple[float, float]): The first vector.
+        vec2 (Tuple[float, float]): The second vector.
+
+    Returns:
+        Tuple[float, float]: The averaged 2D vector.
+    """
+    return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
+
+def substract_vectors(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tuple[float, float]:
+    """
+    Subtract the second vector from the first vector.
+
+    Args:
+        vec1 (Tuple[float, float]): The vector to be subtracted from.
+        vec2 (Tuple[float, float]): The vector to subtract.
+
+    Returns:
+        Tuple[float, float]: The resulting difference vector.
+    """
     return (vec1[0] - vec2[0], vec1[1] - vec2[1])
 
-def multiply_vector(vec: tuple, multiplier: float) -> tuple:
+def multiply_vector(vec: Tuple[float, float], multiplier: float) -> Tuple[float, float]:
+    """
+    Multiply a 2D vector by a scalar value.
+
+    Args:
+        vec (Tuple[float, float]): The input vector.
+        multiplier (float): The scalar value to multiply the vector by.
+
+    Returns:
+        Tuple[float, float]: The scaled vector.
+    """
     return (multiplier * vec[0], multiplier * vec[1])
 
-def normalize_vector(vec: tuple) -> tuple:
-    lenght = get_distance(vec, (0,0))
-    return multiply_vector(vec, 1/lenght)
+def normalize_vector(vec: Tuple[float, float]) -> Tuple[float, float]:
+    """
+    Normalize a 2D vector to a length of 1 (unit vector).
 
-def dot_product(vec1: tuple, vec2: tuple) -> float:
+    Args:
+        vec (Tuple[float, float]): The input vector.
+
+    Returns:
+        Tuple[float, float]: The normalized unit vector.
+    """
+    length = get_distance(vec, (0.0, 0.0))
+    if length == 0:
+        return (0.0, 0.0) # Added safety check for zero division
+    return multiply_vector(vec, 1 / length)
+
+def dot_product(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> float:
+    """
+    Calculate the dot product of two 2D vectors.
+
+    Args:
+        vec1 (Tuple[float, float]): The first vector.
+        vec2 (Tuple[float, float]): The second vector.
+
+    Returns:
+        float: The scalar dot product.
+    """
     return vec1[0] * vec2[0] + vec1[1] * vec2[1]
 
-def extend_vector(vec: tuple, extension: float) -> tuple:
-    current_lenght = get_distance(vec, (0,0))
-    desired_lenght = current_lenght + extension
-    multiplier = desired_lenght / current_lenght
+def extend_vector(vec: Tuple[float, float], extension: float) -> Tuple[float, float]:
+    """
+    Extend the length of a vector by a specified absolute amount while maintaining its direction.
+
+    Args:
+        vec (Tuple[float, float]): The input vector.
+        extension (float): The absolute length to add to the vector.
+
+    Returns:
+        Tuple[float, float]: The extended vector.
+    """
+    current_length = get_distance(vec, (0.0, 0.0))
+    if current_length == 0:
+        return (0.0, 0.0) # Added safety check for zero division
+    desired_length = current_length + extension
+    multiplier = desired_length / current_length
     return multiply_vector(vec, multiplier)
 
-def segment_intersects_circle(p1: Tuple[float, float], p2: Tuple[float, float], radius: float) -> bool:
-    x1, y1 = p1
-    x2, y2 = p2
-    
-    # 1. Quick check: If either point is inside the circle, they intersect the circle's area.
-    # (Remove this block if you strictly only care about crossing the outer boundary edge)
-    if (x1**2 + y1**2 <= radius**2) or (x2**2 + y2**2 <= radius**2):
-        return True
-
-    dx = x2 - x1
-    dy = y2 - y1
-    
-    # 2. Set up the quadratic equation At^2 + Bt + C = 0
-    A = dx**2 + dy**2
-    B = 2 * (x1 * dx + y1 * dy)
-    C = x1**2 + y1**2 - radius**2
-    
-    # If A is 0, the two points are identical (a single point). 
-    # Since we already checked if points are inside above, it doesn't intersect.
-    if A == 0:
-        return False
-        
-    # 3. Calculate discriminant
-    discriminant = B**2 - 4 * A * C
-    
-    # If discriminant is negative, the infinite line misses the circle entirely
-    if discriminant < 0:
-        return False
-        
-    # 4. Calculate the two intersection parameters t1 and t2
-    sqrt_disc = math.sqrt(discriminant)
-    t1 = (-B - sqrt_disc) / (2 * A)
-    t2 = (-B + sqrt_disc) / (2 * A)
-    
-    # 5. Check if either intersection point lies on the actual segment
-    return (0 <= t1 <= 1) or (0 <= t2 <= 1)
-
-def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray) -> tuple:
+def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray) -> Tuple[float, float]:
     """
-    pc_x is positive right of the robot
-    pc_y is positive in front of the robot
-    returns (global_x, global_y), where global x is positive forward and y is positive to the left
-    """
+    Convert local robot-centric coordinates to global coordinate frame.
     
+    Assumptions:
+        - pc_x is positive to the right of the robot.
+        - pc_y is positive in front of the robot.
+        - global_x is positive forward.
+        - global_y is positive to the left.
+
+    Args:
+        pc_x (float): The local x-coordinate.
+        pc_y (float): The local y-coordinate.
+        odometry (np.ndarray): Array containing [robot_global_x, robot_global_y, robot_yaw].
+
+    Returns:
+        Tuple[float, float]: The transformed (global_x, global_y) coordinates.
+    """
     robot_yaw = odometry[2]
     robot_global_x, robot_global_y = odometry[0], odometry[1]
-    x_rotated, y_rotated =  rotate_vector(pc_x, pc_y, robot_yaw)
+    
+    x_rotated, y_rotated = rotate_vector(pc_x, pc_y, robot_yaw)
+    
     point_global_x = robot_global_x + y_rotated
     point_global_y = robot_global_y - x_rotated     # sign changes
+    
     return point_global_x, point_global_y
 
-def global_coords_to_local_coords(global_x: float, global_y: float, odometry: np.ndarray) -> tuple:
+def global_coords_to_local_coords(global_x: float, global_y: float, odometry: np.ndarray) -> Tuple[float, float]:
+    """
+    Convert global coordinates back to the local robot-centric frame.
+
+    Args:
+        global_x (float): The global x-coordinate.
+        global_y (float): The global y-coordinate.
+        odometry (np.ndarray): Array containing [robot_global_x, robot_global_y, robot_yaw].
+
+    Returns:
+        Tuple[float, float]: The transformed (local_x, local_y) coordinates.
+    """
     robot_global_x, robot_global_y, robot_yaw = odometry[0], odometry[1], odometry[2]
 
     # 1. Translate back to robot-centric origin
@@ -200,14 +254,10 @@ def global_coords_to_local_coords(global_x: float, global_y: float, odometry: np
     dy = global_y - robot_global_y
 
     # 2. Revert the axis mapping/sign changes
-    # In the original: 
-    # point_global_x = robot_global_x + y_rotated  => y_rotated = global_x - robot_global_x
-    # point_global_y = robot_global_y - x_rotated  => x_rotated = robot_global_y - global_y
     y_rotated = dx
     x_rotated = -dy 
 
     # 3. Rotate back by the negative yaw
-    # Using the same rotate_vector function but with -robot_yaw
     pc_x, pc_y = rotate_vector(x_rotated, y_rotated, -robot_yaw)
     
     return pc_x, pc_y
