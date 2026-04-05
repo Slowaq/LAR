@@ -25,14 +25,14 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
     """
     frame_bgr = frame.copy()
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
-    
+
     lower_green = np.array([35, 60, 57])
     upper_green = np.array([90, 245, 255])
 
     # create a mask for green color and discard noise
     mask = cv2.inRange(hsv, lower_green, upper_green)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5,5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
 
     # Apply the vertical offset: set top 80 rows to 0 (black)
     mask[0:80, :] = 0
@@ -44,7 +44,7 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
     if contours:
         # sort contours by area from largest to smallest
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
-        
+
         passed_area_check = True
         passed_circularity_check = True
         passed_aspect_ratio_check = True
@@ -52,46 +52,47 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
         for cnt in contours:
             area = cv2.contourArea(cnt)
             if area < 200 or area > 10000:
-                passed_area_check  = False
-            
+                passed_area_check = False
+
             aspect_ratio_lower = ASPECT_RATIO_STRICT_LOWER_THRESHOLD if area > 2000 else ASPECT_RATIO_LOWER_THRESHOLD
             aspect_ratio_upper = ASPECT_RATIO_STRICT_UPPER_THRESHOLD if area > 2000 else ASPECT_RATIO_UPPER_THRESHOLD
-            
+
             # check circularity(roundness) of the contour
             perimeter = cv2.arcLength(cnt, True)
             circularity = 4 * np.pi * area / (perimeter ** 2) if perimeter > 0 else 0
-            
+
             if circularity < CIRCULARITY_THRESHOLD:
                 passed_circularity_check = False
-            
+
             # check the aspect ratio of the rectangle around the ball
             bx, by, w, h = cv2.boundingRect(cnt)
             aspect_ratio = w / h
-            
+
             if (aspect_ratio < aspect_ratio_lower or aspect_ratio > aspect_ratio_upper):
-                passed_aspect_ratio_check  = False
-            
+                passed_aspect_ratio_check = False
+
             ((x, y), radius) = cv2.minEnclosingCircle(cnt)
             x, y = int(x), int(y)
 
             # Save the coordinates of the largest contour (the first one processed)
             if target_coords is None and passed_area_check and passed_circularity_check and passed_aspect_ratio_check:
-                cv2.circle(frame_bgr, (x, y), 3, (0,0,255), -1)  
+                cv2.circle(frame_bgr, (x, y), 3, (0, 0, 255), -1)
                 target_coords = (x, y)
 
             # kreslenie - draw bounding circle and center for EVERY contour
-            cv2.circle(frame_bgr, (x, y), int(radius), (0,255,0), 2)
-            
+            cv2.circle(frame_bgr, (x, y), int(radius), (0, 255, 0), 2)
+
             # Put text next to the object with area (A) and circularity (C)
             label = f"A:{area} C:{circularity:.2f}, R:{aspect_ratio:.2f}"
-            cv2.putText(frame_bgr, label, (x + 10, y + 10), 
+            cv2.putText(frame_bgr, label, (x + 10, y + 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             checks = f"A:{passed_area_check} C: {passed_circularity_check}, R: {passed_aspect_ratio_check}"
-            cv2.putText(frame_bgr, checks, (x + 10, y + 25), 
+            cv2.putText(frame_bgr, checks, (x + 10, y + 25),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
     # Return the target coordinates (if any were found), the drawn frame, and the mask
     return target_coords, frame_bgr, mask
+
 
 def find_purple_quads(frame_bgr: np.ndarray) -> Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]:
     """
@@ -134,14 +135,14 @@ def find_purple_quads(frame_bgr: np.ndarray) -> Tuple[List[Tuple[int, int]], np.
         hull = cv2.convexHull(cnt)
         hull_area = cv2.contourArea(hull)
         solidity = float(area) / hull_area if hull_area > 0 else 0
-        if solidity < 0.8: # Filter out "hollow" or complex shapes
+        if solidity < 0.8:  # Filter out "hollow" or complex shapes
             continue
 
         # 2. Aspect Ratio Check
         _, _, w, h = cv2.boundingRect(cnt)
         aspect_ratio = float(w) / h
         # Wh expect tall rectangles
-        if aspect_ratio > 0.5: 
+        if aspect_ratio > 0.5:
             continue
 
         # Compute 4-point bounding box

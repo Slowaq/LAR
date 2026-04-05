@@ -12,6 +12,7 @@ BUTTON_B0 = 0
 BUTTON_B1 = 1
 BUTTON_B2 = 2
 
+
 def register_callbacks(algorithm: Algorithm) -> None:
     """
     Register bumper and button event callbacks on the robot.

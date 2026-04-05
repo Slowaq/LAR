@@ -2,6 +2,7 @@ import math
 import numpy as np
 from typing import Tuple, Optional
 
+
 def get_average_of_nearby_pixels(pc: np.ndarray, y: int, x: int, window_size: int = 5) -> Optional[np.ndarray]:
     """
     Compute the average 3D point in a window around (y, x), filtering out
@@ -66,7 +67,7 @@ def get_average_of_nearby_pixels(pc: np.ndarray, y: int, x: int, window_size: in
         # Check Euclidean distance between the point and the reference point(s)
         # If it's <= 0.1 to ANY valid reference point, we keep it.
         distances = [np.linalg.norm(p - ref) for ref in ref_points]
-        
+
         if min(distances) <= 0.1:
             filtered_points.append(p)
 
@@ -74,6 +75,7 @@ def get_average_of_nearby_pixels(pc: np.ndarray, y: int, x: int, window_size: in
         return None
 
     return np.mean(filtered_points, axis=0)
+
 
 def get_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
     """
@@ -90,6 +92,7 @@ def get_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> fl
     dy = point1[1] - point2[1]
     return math.hypot(dx, dy)
 
+
 def normalize_angle(angle: float) -> float:
     """
     Normalizes an angle to the range [-pi, pi).
@@ -101,6 +104,7 @@ def normalize_angle(angle: float) -> float:
         float: The normalized angle in the range [-pi, pi).
     """
     return (angle + math.pi) % (2 * math.pi) - math.pi
+
 
 def rotate_vector(x: float, y: float, phi: float) -> Tuple[float, float]:
     """
@@ -116,11 +120,12 @@ def rotate_vector(x: float, y: float, phi: float) -> Tuple[float, float]:
     """
     cos_phi = math.cos(phi)
     sin_phi = math.sin(phi)
-    
+
     x_new = x * cos_phi - y * sin_phi
     y_new = x * sin_phi + y * cos_phi
-    
+
     return x_new, y_new
+
 
 def average_vector(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tuple[float, float]:
     """
@@ -135,18 +140,6 @@ def average_vector(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tupl
     """
     return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
-def substract_vectors(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tuple[float, float]:
-    """
-    Subtract the second vector from the first vector.
-
-    Args:
-        vec1 (Tuple[float, float]): The vector to be subtracted from.
-        vec2 (Tuple[float, float]): The vector to subtract.
-
-    Returns:
-        Tuple[float, float]: The resulting difference vector.
-    """
-    return (vec1[0] - vec2[0], vec1[1] - vec2[1])
 
 def multiply_vector(vec: Tuple[float, float], multiplier: float) -> Tuple[float, float]:
     """
@@ -161,33 +154,6 @@ def multiply_vector(vec: Tuple[float, float], multiplier: float) -> Tuple[float,
     """
     return (multiplier * vec[0], multiplier * vec[1])
 
-def normalize_vector(vec: Tuple[float, float]) -> Tuple[float, float]:
-    """
-    Normalize a 2D vector to a length of 1 (unit vector).
-
-    Args:
-        vec (Tuple[float, float]): The input vector.
-
-    Returns:
-        Tuple[float, float]: The normalized unit vector.
-    """
-    length = get_distance(vec, (0.0, 0.0))
-    if length == 0:
-        return (0.0, 0.0) # Added safety check for zero division
-    return multiply_vector(vec, 1 / length)
-
-def dot_product(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> float:
-    """
-    Calculate the dot product of two 2D vectors.
-
-    Args:
-        vec1 (Tuple[float, float]): The first vector.
-        vec2 (Tuple[float, float]): The second vector.
-
-    Returns:
-        float: The scalar dot product.
-    """
-    return vec1[0] * vec2[0] + vec1[1] * vec2[1]
 
 def extend_vector(vec: Tuple[float, float], extension: float) -> Tuple[float, float]:
     """
@@ -202,15 +168,16 @@ def extend_vector(vec: Tuple[float, float], extension: float) -> Tuple[float, fl
     """
     current_length = get_distance(vec, (0.0, 0.0))
     if current_length == 0:
-        return (0.0, 0.0) # Added safety check for zero division
+        return (0.0, 0.0)  # Added safety check for zero division
     desired_length = current_length + extension
     multiplier = desired_length / current_length
     return multiply_vector(vec, multiplier)
 
+
 def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray) -> Tuple[float, float]:
     """
     Convert local robot-centric coordinates to global coordinate frame.
-    
+
     Assumptions:
         - pc_x is positive to the right of the robot.
         - pc_y is positive in front of the robot.
@@ -227,13 +194,14 @@ def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray
     """
     robot_yaw = odometry[2]
     robot_global_x, robot_global_y = odometry[0], odometry[1]
-    
+
     x_rotated, y_rotated = rotate_vector(pc_x, pc_y, robot_yaw)
-    
+
     point_global_x = robot_global_x + y_rotated
     point_global_y = robot_global_y - x_rotated     # sign changes
-    
+
     return point_global_x, point_global_y
+
 
 def global_coords_to_local_coords(global_x: float, global_y: float, odometry: np.ndarray) -> Tuple[float, float]:
     """
@@ -255,9 +223,9 @@ def global_coords_to_local_coords(global_x: float, global_y: float, odometry: np
 
     # 2. Revert the axis mapping/sign changes
     y_rotated = dx
-    x_rotated = -dy 
+    x_rotated = -dy
 
     # 3. Rotate back by the negative yaw
     pc_x, pc_y = rotate_vector(x_rotated, y_rotated, -robot_yaw)
-    
+
     return pc_x, pc_y
