@@ -42,11 +42,11 @@ class Algorithm:
             None
         """
         self.stop = False  
-        self.points_visited = []    
+        self.points_visited = [(0.6, 0)]    
         self.robot.reset_odometry() 
-        self.exit_garage()    
-        self.approach_pylon()
-        self.drive_around_pylon()
+        # self.exit_garage()    
+        # self.approach_pylon()
+        # self.drive_around_pylon()
         self.return_to_garage()
 
         if self.stop:
@@ -453,7 +453,7 @@ class Algorithm:
             if total_rotated > 2* math.pi + 0.2:
                 break
 
-            pillars, _, _ = find_purple_quads(rgb_image)
+            pillars, annotated_brg, image_bw = find_purple_quads(rgb_image)
 
             if not pillars: 
                 continue
@@ -471,17 +471,21 @@ class Algorithm:
                     return []
                 delta_x = pillar_pc[0]
                 delta_y = pillar_pc[2]
+
+                CAMERA_ANGULAR_OFFSET = 0.1
+                delta_x, delta_y = rotate_vector(delta_x, delta_y, CAMERA_ANGULAR_OFFSET)
+
                 delta_yaw = math.atan2(delta_x, delta_y)
                 center_yaw = normalize_angle(current_yaw - delta_yaw)       # Minus because of flipped y-axis compared to global system 
                 global_x, global_y = local_coords_to_global_coords(delta_x, delta_y, odometry)       # Global x is in front of the robot and global y is to the left
 
                 if stop_spinning:
                     # We have an accurate read
-                    found_pillars.append((global_x, global_y, center_yaw))                    
+                    found_pillars.append((global_x, global_y, center_yaw))   
+
                     stop_spinning = False
 
-                # Ignore pillars we have already seen
-                elif not any([abs((current_yaw - delta_yaw) - x[2]) < 0.3 for x in found_pillars]):
+                elif not any([abs((current_yaw - delta_yaw) - x[2]) < 0.4 for x in found_pillars]):
                     stop_spinning = True    # Robot will stop and wait for fresh point cloud and RGB data
                     continue
 
@@ -515,17 +519,18 @@ class Algorithm:
             print(f"right globally: {pillar_2}")
 
             garage_gate = average_vector(pillar_1, pillar_2)
-            garage_gate = extend_vector(garage_gate, GOAL_DISTANCE_TOLERANCE) # go a bit further to compensate for tolerance
             print(f"garage_gate: {garage_gate}")
 
-            if not self._go_to_point_using_odometry(*garage_gate):
-                return False
-            
-            target_angle = math.atan2(
-                pillar_2[0] - pillar_1[0],
-                pillar_2[1] - pillar_1[1]
-            )
+            # Calculate the vector from pillar 1 to pillar 2
+            dx = pillar_2[0] - pillar_1[0]
+            dy = pillar_2[1] - pillar_1[1]
 
+            # Perpendicular vector components:
+            # normal_x = -dy
+            # normal_y = dx
+            target_angle = math.atan2(dx, -dy) # atan2(y_comp, x_comp)
+
+            
             odometry = self.robot.get_odometry()
             if odometry is None:
                 return False    # robot got interrupted
@@ -533,12 +538,84 @@ class Algorithm:
             # Make sure the robot is not facing the opposite direction
             if abs(normalize_angle(target_angle - current_yaw)) > math.pi / 2:
                 target_angle = normalize_angle(target_angle + math.pi)
+            print(f"target angle: {target_angle:.3f}")
+
+            # --- Visualization Call ---
+            self._visualize_garage_logic(odometry, [pillar_1, pillar_2], garage_gate, target_angle)
+            # --------------------------
+            
+            
+            if not self._go_to_point_using_odometry(*garage_gate):
+                return False
+            
         else:
             # Failsafe if finding pillars fails
             target_angle = math.pi
 
-        print(f"target angle: {target_angle:.3f}")
         return self._rotate_to_angle(target_angle)
+    
+    def _visualize_garage_logic(self, odom, pillars, gate, target_angle):
+        """Renders the robot's world view in ROS coordinates."""
+        import cv2
+        import numpy as np
+        import math
+
+        # Settings
+        canvas_size = 600
+        scale = 600  # 600px = 1 meter
+        view_center_ros = (0.5, 0.0) 
+        img = np.zeros((canvas_size, canvas_size, 3), dtype=np.uint8)
+
+        def to_px(point):
+            # Calculate displacement from (0.5, 0)
+            dx = point[0] - view_center_ros[0]
+            dy = point[1] - view_center_ros[1]
+            # ROS X+ is image UP, ROS Y+ is image LEFT
+            px = int((canvas_size / 2) - (dy * scale))
+            py = int((canvas_size / 2) - (dx * scale))
+            return (px, py)
+
+        # 1. Draw Pillars (Yellow)
+        for p in pillars:
+            cv2.circle(img, to_px(p), 8, (0, 255, 255), -1)
+
+        # 2. Draw Garage Gate (Green)
+        gate_px = to_px(gate)
+        cv2.drawMarker(img, gate_px, (0, 255, 0), cv2.MARKER_CROSS, 20, 2)
+
+        # 3. Draw Robot current position (Blue)
+        rob_pos_px = to_px(odom[:2])
+        cv2.circle(img, rob_pos_px, 10, (255, 100, 0), -1) # Brighter blue
+
+        # 4. Target Angle Arrow from GATE (Red)
+        # Length 10cm
+        t_arrow_end = (
+            gate[0] + math.cos(target_angle) * 0.1,
+            gate[1] + math.sin(target_angle) * 0.1
+        )
+        cv2.arrowedLine(img, gate_px, to_px(t_arrow_end), (0, 0, 255), 3, tipLength=0.4)
+
+        # 5. Robot Heading Arrow from ROBOT (Cyan/Light Blue)
+        # Length 10cm
+        current_yaw = odom[2]
+        r_arrow_end = (
+            odom[0] + math.cos(current_yaw) * 0.1,
+            odom[1] + math.sin(current_yaw) * 0.1
+        )
+        cv2.arrowedLine(img, rob_pos_px, to_px(r_arrow_end), (255, 255, 0), 2, tipLength=0.3)
+
+        # UI Overlays
+        cv2.putText(img, "Red: Target Angle | Cyan: Robot Heading", (10, 25), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.putText(img, "ESC to close", (10, 580), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        
+        while True:
+            cv2.imshow("Garage Navigation Logic", img)
+            key = cv2.waitKey(1) & 0xFF
+            if key == 27: # ESC
+                cv2.destroyAllWindows()
+                break
 
     def approach_garage(self) -> bool:
         """Navigates the robot to the approximate front of the garage.
