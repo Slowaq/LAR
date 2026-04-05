@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import cv2
 from typing import List, Optional, Tuple
@@ -9,7 +11,9 @@ ASPECT_RATIO_STRICT_LOWER_THRESHOLD = 0.8
 ASPECT_RATIO_STRICT_UPPER_THRESHOLD = 1.25
 
 
-def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]:
+def find_pylon(
+    frame: np.ndarray
+) -> Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]:
     """
     Detect the green pylon in an RGB frame.
 
@@ -54,12 +58,24 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
             if area < 200 or area > 10000:
                 passed_area_check = False
 
-            aspect_ratio_lower = ASPECT_RATIO_STRICT_LOWER_THRESHOLD if area > 2000 else ASPECT_RATIO_LOWER_THRESHOLD
-            aspect_ratio_upper = ASPECT_RATIO_STRICT_UPPER_THRESHOLD if area > 2000 else ASPECT_RATIO_UPPER_THRESHOLD
+            aspect_ratio_lower = (
+                ASPECT_RATIO_STRICT_LOWER_THRESHOLD
+                if area > 2000
+                else ASPECT_RATIO_LOWER_THRESHOLD
+            )
+            aspect_ratio_upper = (
+                ASPECT_RATIO_STRICT_UPPER_THRESHOLD
+                if area > 2000
+                else ASPECT_RATIO_UPPER_THRESHOLD
+            )
 
             # check circularity(roundness) of the contour
             perimeter = cv2.arcLength(cnt, True)
-            circularity = 4 * np.pi * area / (perimeter ** 2) if perimeter > 0 else 0
+            circularity = (
+                4 * np.pi * area / (perimeter ** 2)
+                if perimeter > 0
+                else 0
+            )
 
             if circularity < CIRCULARITY_THRESHOLD:
                 passed_circularity_check = False
@@ -68,33 +84,51 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
             bx, by, w, h = cv2.boundingRect(cnt)
             aspect_ratio = w / h
 
-            if (aspect_ratio < aspect_ratio_lower or aspect_ratio > aspect_ratio_upper):
+            if (
+                aspect_ratio < aspect_ratio_lower
+                or aspect_ratio > aspect_ratio_upper
+            ):
                 passed_aspect_ratio_check = False
 
             ((x, y), radius) = cv2.minEnclosingCircle(cnt)
             x, y = int(x), int(y)
 
             # Save the coordinates of the largest contour (the first one processed)
-            if target_coords is None and passed_area_check and passed_circularity_check and passed_aspect_ratio_check:
+            if (
+                target_coords is None
+                and passed_area_check
+                and passed_circularity_check
+                and passed_aspect_ratio_check
+            ):
                 cv2.circle(frame_bgr, (x, y), 3, (0, 0, 255), -1)
                 target_coords = (x, y)
 
             # kreslenie - draw bounding circle and center for EVERY contour
             cv2.circle(frame_bgr, (x, y), int(radius), (0, 255, 0), 2)
 
-            # Put text next to the object with area (A) and circularity (C)
-            label = f"A:{area} C:{circularity:.2f}, R:{aspect_ratio:.2f}"
-            cv2.putText(frame_bgr, label, (x + 10, y + 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-            checks = f"A:{passed_area_check} C: {passed_circularity_check}, R: {passed_aspect_ratio_check}"
-            cv2.putText(frame_bgr, checks, (x + 10, y + 25),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            label = (
+                f"A:{area} C:{circularity:.2f}, R:{aspect_ratio:.2f}"
+            )
+            cv2.putText(
+                frame_bgr, label, (x + 10, y + 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1
+            )
+            checks = (
+                f"A:{passed_area_check} C: {passed_circularity_check}, "
+                f"R: {passed_aspect_ratio_check}"
+            )
+            cv2.putText(
+                frame_bgr, checks, (x + 10, y + 25),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1
+            )
 
     # Return the target coordinates (if any were found), the drawn frame, and the mask
     return target_coords, frame_bgr, mask
 
 
-def find_purple_quads(frame_bgr: np.ndarray) -> Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]:
+def find_purple_quads(
+    frame_bgr: np.ndarray
+) -> Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]:
     """
     Detect purple rectangular quads in a BGR frame.
 
@@ -120,7 +154,9 @@ def find_purple_quads(frame_bgr: np.ndarray) -> Tuple[List[Tuple[int, int]], np.
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5, 5), np.uint8))
     frame_bw = mask.copy()
 
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     detected = []
     centers = []

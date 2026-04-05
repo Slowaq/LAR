@@ -60,7 +60,8 @@ def register_callbacks(algorithm: Algorithm) -> None:
             None
         """
         if msg.state == STATE_PRESSED:
-            if msg.button == BUTTON_B0 and algorithm.stop:  # Only when the robot is inactive
+            # Only start when robot is inactive
+            if msg.button == BUTTON_B0 and algorithm.stop:
                 print("Button B0 pressed - starting execution")
                 algorithm.run()
             elif msg.button == BUTTON_B1 and not algorithm.stop:

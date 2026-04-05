@@ -20,8 +20,10 @@ DEFAULT_DRIVE_SPEED = 0.2
 DEFAULT_ROTATION_SPEED = 0.9
 MAX_ROTATION_SPEED = 0.7
 MIN_ROTATION_SPEED = 0.2
-HEADING_KP = 5.0   # proportional gain for heading correction, proportional to angle error in radians
-GARAGE_WALL_DISTANCE = 0.34  # [m] distance from the wall when parking into garage
+# Proportional gain for heading correction, proportional to angle error (rad)
+HEADING_KP = 5.0
+# Distance from wall when parking into garage (meters)
+GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
@@ -36,9 +38,12 @@ PYLON_SEARCH_PATH = [(0.6, 0)] + [
 class Algorithm:
     def __init__(self) -> None:
         self.robot: Turtlebot = Turtlebot(rgb=True, depth=True, pc=True)
-        self.stop: bool = True  # When a bumper hits something or a button is pressed, the robot stops.
-        self.record_trajectory: bool = False  # If true, the robot's trajectory is stored in self.trajectory.
-        self.trajectory: List[Tuple[float, float]] = []  # Used for storing the trajectory of the robot for debugging purposes.
+        # When bumper hits or button pressed, the robot stops
+        self.stop: bool = True
+        # If true, robot trajectory is stored for debugging
+        self.record_trajectory: bool = False
+        # List to store the trajectory of the robot
+        self.trajectory: List[Tuple[float, float]] = []
         self.points_visited: List[Tuple[float, float]] = []
 
     def run(self) -> None:
@@ -128,7 +133,8 @@ class Algorithm:
             if data.size > 50:
                 dist = np.percentile(data, 10)
             else:
-                self.robot.cmd_velocity(0, MIN_ROTATION_SPEED)  # fallback if pointcloud data are horrible
+                # Fallback if pointcloud data are horrible
+                self.robot.cmd_velocity(0, MIN_ROTATION_SPEED)
                 continue
 
             current_odom = self.robot.get_odometry()
@@ -153,9 +159,17 @@ class Algorithm:
 
             # [2] - we have the first yaw, but not the second one
             elif second_wall_yaw is None:
-                self.robot.cmd_velocity(0, -GARAGE_EXIT_ROTATION_SPEED)  # rotate counterclockwise
+                self.robot.cmd_velocity(
+                    0, -GARAGE_EXIT_ROTATION_SPEED
+                )  # rotate counterclockwise
                 # Check that we turned far enough away from first edge
-                if dist <= EXIT_FREE_SPACE_THRESHOLD and abs(normalize_angle(first_wall_end_yaw - current_yaw)) > MIN_GARAGE_GATE_ANGLE:
+                angle_diff = abs(
+                    normalize_angle(first_wall_end_yaw - current_yaw)
+                )
+                if (
+                    dist <= EXIT_FREE_SPACE_THRESHOLD
+                    and angle_diff > MIN_GARAGE_GATE_ANGLE
+                ):
                     second_wall_yaw = current_yaw
                     print(f"Second wall found at yaw={second_wall_yaw:.2f}")
 
@@ -168,7 +182,10 @@ class Algorithm:
                 if first_wall_end_yaw < second_wall_yaw:
                     mid_yaw += math.pi
 
-                delta_to_mid = normalize_angle(mid_yaw - second_wall_yaw + EXIT_CAMERA_YAW_OFFSET)  # To compensate for the fact that the camera does not head straight ahead
+                # Compensate for camera offset not pointing straight ahead
+                delta_to_mid = normalize_angle(
+                    mid_yaw - second_wall_yaw + EXIT_CAMERA_YAW_OFFSET
+                )
 
                 print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
 
@@ -194,14 +211,20 @@ class Algorithm:
         """
         for point in PYLON_SEARCH_PATH:
             if not self._go_to_point_using_odometry(*point):
-                print(f"Driving to point ({point[0]:.2f}, {point[1]:.2f}) failed")
+                print(
+                    f"Driving to point ({point[0]:.2f}, "
+                    f"{point[1]:.2f}) failed"
+                )
                 return
             self.points_visited.append(point)
 
             if self.look_for_pylon():
                 return
             else:
-                print("Couldnt find pylon from this position - trying different point")
+                print(
+                    f"Couldnt find pylon from this position "
+                    f"- trying different point"
+                )
         print("Couldnt find pylon at all")
 
     def look_for_pylon(self) -> bool:
@@ -274,8 +297,10 @@ class Algorithm:
                     x_pixel_error = column - 320
                     distance = pylon_pc[2]  # pylon local y
 
-                    # Ensure you unpack or access the local x and y correctly based on your method's return type
-                    origin_local = global_coords_to_local_coords(0, 0, odometry)
+                    # Get local coordinates of garage origin
+                    origin_local = global_coords_to_local_coords(
+                        0, 0, odometry
+                    )
                     origin_local_x = origin_local[0]
                     origin_local_y = origin_local[1]
 
@@ -293,8 +318,10 @@ class Algorithm:
 
                         robot_had_to_dodge_garage = True
 
-                        # Scale avoidance: Stronger push (max 0.4) when the origin is dead center
-                        avoidance_strength = 1 * (0.8 - abs(origin_local_x)) / 0.8
+                        # Scale avoidance: max 0.4 when origin centered
+                        avoidance_strength = (
+                            1 * (0.8 - abs(origin_local_x)) / 0.8
+                        )
 
                         # If origin is to the right (x >= 0), steer left (+ angular).
                         # If origin is to the left (x < 0), steer right (- angular).
@@ -305,14 +332,25 @@ class Algorithm:
 
                     angular_pixel_error = -x_pixel_error * 0.001
 
-                    # The avoid angular takes precedence, pushing the robot off the collision line
-                    angular = min(max(angular_pixel_error + angular_avoid_garage, -0.6), 0.6)
+                    # Avoid angular takes precedence, pushes robot off
+                    angular = min(
+                        max(angular_pixel_error + angular_avoid_garage, -0.6),
+                        0.6
+                    )
 
             # ak máme validnú vzdialenosť
             if distance is not None and not np.isnan(distance):
                 # riadenie dopredného pohybu
-                print(f"distance: {distance:.2f}, x_pixel_error: {x_pixel_error:.2f}, target_distace: {PYLON_APPROACH_DISTANCE:.2f}")
-                print(f"pixel_angular: {angular_pixel_error:.2f}, garage_angular: {angular_avoid_garage:.2f}, total: {angular:.2f}")
+                print(
+                    f"distance: {distance:.2f}, "
+                    f"x_pixel_error: {x_pixel_error:.2f}, "
+                    f"target_distace: {PYLON_APPROACH_DISTANCE:.2f}"
+                )
+                print(
+                    f"pixel_angular: {angular_pixel_error:.2f}, "
+                    f"garage_angular: {angular_avoid_garage:.2f}, "
+                    f"total: {angular:.2f}"
+                )
                 if distance > PYLON_APPROACH_DISTANCE:
                     print("Going after target")
                     linear = 0.1
@@ -332,10 +370,15 @@ class Algorithm:
                             if odometry is None:
                                 continue    # Only happens if robot got interrupted
                             distance = pylon_pc[2]
-                            # We can drive a bit more forward, but the camera wont see the pylon anymore
+                            # We can drive a bit more forward, but 
+                            # the camera wont see the pylon anymore
                             pylon_local = (pylon_pc[0], distance)
-                            target_point_local = extend_vector(pylon_local, -0.3)
-                            target_point = local_coords_to_global_coords(*target_point_local, odometry)
+                            target_point_local = extend_vector(
+                                pylon_local, -0.3
+                            )
+                            target_point = local_coords_to_global_coords(
+                                *target_point_local, odometry
+                            )
 
                             if robot_had_to_dodge_garage:
                                 # make sure robot avoid garage on its way back also
@@ -446,7 +489,8 @@ class Algorithm:
                 self.robot.cmd_velocity(0, 0.4)
             else:
                 self.robot.cmd_velocity(0, 0)
-                self._wait_for_new_data()  # Robot should not be moving while waiting for point cloud
+                # Robot should not be moving while waiting for data
+                self._wait_for_new_data()
 
             pc = self.robot.get_point_cloud()
             rgb_image = self.robot.get_rgb_image()
@@ -465,7 +509,7 @@ class Algorithm:
             if not pillars:
                 continue
 
-            # Focus only on the center that is in the middle of the screen, as the depth camera is most accurate there
+            # Focus on the center (most accurate for depth camera)
             pillars.sort(key=lambda x: abs(x[0] - 320))
             center_of_pillar = pillars[0]
             column, row = center_of_pillar[0], center_of_pillar[1]
@@ -482,8 +526,12 @@ class Algorithm:
                 delta_x, delta_y = rotate_vector(delta_x, delta_y, CAMERA_ANGULAR_OFFSET)
 
                 delta_yaw = math.atan2(delta_x, delta_y)
-                center_yaw = normalize_angle(current_yaw - delta_yaw)       # Minus because of flipped y-axis compared to global system
-                global_x, global_y = local_coords_to_global_coords(delta_x, delta_y, odometry)       # Global x is in front of the robot and global y is to the left
+                # Minus because of flipped y-axis compared to global system
+                center_yaw = normalize_angle(current_yaw - delta_yaw)
+                # Global x is in front of robot, global y is to the left
+                global_x, global_y = local_coords_to_global_coords(
+                    delta_x, delta_y, odometry
+                )
 
                 if stop_spinning:
                     # We have an accurate read
@@ -491,8 +539,12 @@ class Algorithm:
 
                     stop_spinning = False
 
-                elif not any([abs((current_yaw - delta_yaw) - x[2]) < 0.4 for x in found_pillars]):
-                    stop_spinning = True    # Robot will stop and wait for fresh point cloud and RGB data
+                elif not any(
+                    [abs((current_yaw - delta_yaw) - x[2]) < 0.4
+                     for x in found_pillars]
+                ):
+                    # Wait for fresh point cloud and RGB data
+                    stop_spinning = True
                     continue
 
         if len(found_pillars) == 2:
@@ -562,7 +614,8 @@ class Algorithm:
             bool: True if it successfully reaches the approach point and rotates, False otherwise.
         """
         for point in self.points_visited[::-1]:
-            if not self._go_to_point_using_odometry(*point):  # Get in front of garage approximately using odometry
+            # Get in front of garage approximately using odometry
+            if not self._go_to_point_using_odometry(*point):
                 return False
         return self._rotate_to_angle(math.pi)
 
@@ -576,7 +629,10 @@ class Algorithm:
         Returns:
             bool: True if successfully parked, False if interrupted or if it fails.
         """
-        print(f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall.")
+        print(
+            f"Driving into garage to a distance of "
+            f"{GARAGE_WALL_DISTANCE:.2f} m from the wall."
+        )
 
         # Rotate towards garage
         # We assume the robot is standing on the axis between the purple pillars
@@ -655,9 +711,14 @@ class Algorithm:
         target_point = local_coords_to_global_coords(0, distance, odometry)
         return self._go_to_point_using_odometry(*target_point)
 
-    def _rotate_by_angle(self, target_delta_yaw: float, angular_speed: float = DEFAULT_ROTATION_SPEED) -> bool:
+    def _rotate_by_angle(
+        self,
+        target_delta_yaw: float,
+        angular_speed: float = DEFAULT_ROTATION_SPEED
+    ) -> bool:
         """
-        Rotate the robot by a desired angular displacement using odometry feedback.
+        Rotate the robot by a desired angular displacement using
+        odometry feedback.
 
         This method performs a closed-loop rotation based on the robot's current yaw.
         A proportional controller is used to smoothly approach the target angle while
@@ -680,7 +741,10 @@ class Algorithm:
             True if the rotation was successfully completed, False if interrupted
             (e.g., due to shutdown, stop flag, or missing odometry data).
         """
-        print(f"Rotaing by {target_delta_yaw:.2f} with angular speed {angular_speed:.2f}")
+        print(
+            f"Rotaing by {target_delta_yaw:.2f} with angular speed "
+            f"{angular_speed:.2f}"
+        )
 
         self._wait_for_odometry()
         start = self.robot.get_odometry()
@@ -718,7 +782,10 @@ class Algorithm:
         self.robot.cmd_velocity(0, 0)
         return False
 
-    def _rotate_to_angle(self, target_yaw: float, angular_speed: float = DEFAULT_ROTATION_SPEED) -> bool:
+    def _rotate_to_angle(
+        self, target_yaw: float,
+        angular_speed: float = DEFAULT_ROTATION_SPEED
+    ) -> bool:
         """
         Rotate the robot to an absolute yaw angle using odometry.
 
@@ -745,13 +812,19 @@ class Algorithm:
         # Compute shortest angular difference
         target_delta_yaw = normalize_angle(target_yaw - current_yaw)
 
-        print(f"Rotating to absolute yaw {target_yaw:.2f} (delta: {target_delta_yaw:.2f})")
+        print(
+            f"Rotating to absolute yaw {target_yaw:.2f} "
+            f"(delta: {target_delta_yaw:.2f})"
+        )
 
         return self._rotate_by_angle(target_delta_yaw, angular_speed)
 
-    def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = DEFAULT_DRIVE_SPEED) -> bool:
+    def _drive_to_the_point(
+        self, dest_x: float, dest_y: float,
+        speed: float = DEFAULT_DRIVE_SPEED
+    ) -> bool:
         """
-        Drive the robot toward a target 2D point using odometry-based feedback control.
+        Drive the robot toward a target 2D point using odometry feedback.
 
         The robot continuously adjusts its heading using a proportional angular controller
         to stay aligned with the target point while moving forward. If the heading error
@@ -933,7 +1006,11 @@ class Algorithm:
         has_new_data = False
         while not (has_new_data or self._is_stopping()):
             sleep(0.5)
-            has_new_data = self.robot.has_odometry() and self.robot.has_rgb_image() and self.robot.has_point_cloud()
+            has_new_data = (
+                self.robot.has_odometry()
+                and self.robot.has_rgb_image()
+                and self.robot.has_point_cloud()
+            )
 
     def _is_stopping(self) -> bool:
         """

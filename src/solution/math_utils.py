@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import math
 import numpy as np
 from typing import Tuple, Optional
 
 
-def get_average_of_nearby_pixels(pc: np.ndarray, y: int, x: int, window_size: int = 5) -> Optional[np.ndarray]:
+def get_average_of_nearby_pixels(
+    pc: np.ndarray, y: int, x: int, window_size: int = 5
+) -> Optional[np.ndarray]:
     """
     Compute the average 3D point in a window around (y, x), filtering out
     points further than 0.1 from the center pixel (or middle column).
@@ -77,7 +81,9 @@ def get_average_of_nearby_pixels(pc: np.ndarray, y: int, x: int, window_size: in
     return np.mean(filtered_points, axis=0)
 
 
-def get_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:
+def get_distance(
+    point1: Tuple[float, float], point2: Tuple[float, float]
+) -> float:
     """
     Calculate the Euclidean distance between two 2D points.
 
@@ -127,7 +133,9 @@ def rotate_vector(x: float, y: float, phi: float) -> Tuple[float, float]:
     return x_new, y_new
 
 
-def average_vector(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tuple[float, float]:
+def average_vector(
+    vec1: Tuple[float, float], vec2: Tuple[float, float]
+) -> Tuple[float, float]:
     """
     Calculate the mathematical average of two 2D vectors.
 
@@ -141,7 +149,9 @@ def average_vector(vec1: Tuple[float, float], vec2: Tuple[float, float]) -> Tupl
     return ((vec1[0] + vec2[0]) / 2, (vec1[1] + vec2[1]) / 2)
 
 
-def multiply_vector(vec: Tuple[float, float], multiplier: float) -> Tuple[float, float]:
+def multiply_vector(
+    vec: Tuple[float, float], multiplier: float
+) -> Tuple[float, float]:
     """
     Multiply a 2D vector by a scalar value.
 
@@ -155,9 +165,12 @@ def multiply_vector(vec: Tuple[float, float], multiplier: float) -> Tuple[float,
     return (multiplier * vec[0], multiplier * vec[1])
 
 
-def extend_vector(vec: Tuple[float, float], extension: float) -> Tuple[float, float]:
+def extend_vector(
+    vec: Tuple[float, float], extension: float
+) -> Tuple[float, float]:
     """
-    Extend the length of a vector by a specified absolute amount while maintaining its direction.
+    Extend the length of a vector by a specified absolute amount while
+    maintaining its direction.
 
     Args:
         vec (Tuple[float, float]): The input vector.
@@ -174,7 +187,9 @@ def extend_vector(vec: Tuple[float, float], extension: float) -> Tuple[float, fl
     return multiply_vector(vec, multiplier)
 
 
-def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray) -> Tuple[float, float]:
+def local_coords_to_global_coords(
+    pc_x: float, pc_y: float, odometry: np.ndarray
+) -> Tuple[float, float]:
     """
     Convert local robot-centric coordinates to global coordinate frame.
 
@@ -203,7 +218,9 @@ def local_coords_to_global_coords(pc_x: float, pc_y: float, odometry: np.ndarray
     return point_global_x, point_global_y
 
 
-def global_coords_to_local_coords(global_x: float, global_y: float, odometry: np.ndarray) -> Tuple[float, float]:
+def global_coords_to_local_coords(
+    global_x: float, global_y: float, odometry: np.ndarray
+) -> Tuple[float, float]:
     """
     Convert global coordinates back to the local robot-centric frame.
 
