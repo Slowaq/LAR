@@ -5,30 +5,23 @@ import numpy as np
 import math
 from typing import Tuple, List
 
-EXIT_ANGULAR_VELOCITY = 0.3
-DISTANCE_TOL = 0.085
-SPEED_TO_THE_POINT = 0.2
-ANGULAR_TO_THE_POINT = 0.9
-ANGULAR_TO_THE_POINT_CLAMP = 0.7
-MINIMAL_ANGULAR_VELOCITY = 0.2
-KP_ANG = 5.0   # proportional gain for heading correction, proportional to angle error in radians
-KP_ANG_PIXELS = 0.003 # proportional gain for heading correction, proportional to angle error pixels
-DISTANCE_OUT_OF_GARAGE = 0.5 # [m] how far should the robot drive out ouf the garade in the exit_garage() method
+GARAGE_EXIT_ROTATION_SPEED = 0.3
+GOAL_DISTANCE_TOLERANCE = 0.085
+DEFAULT_DRIVE_SPEED = 0.2
+DEFAULT_ROTATION_SPEED = 0.9
+MAX_ROTATION_SPEED = 0.7
+MIN_ROTATION_SPEED = 0.2
+HEADING_KP = 5.0   # proportional gain for heading correction, proportional to angle error in radians
 GARAGE_WALL_DISTANCE = 0.34 # [m] distance from the wall when parking into garage
-FREE_SPACE_DISTANCE_THRESHOLD = 0.50
-MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
-CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
-LINEAR_PARKING_VELOCITY = 0.05
-PATH_AROUND_PYLON = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
-PATH_RADIUS = 2
-PATH_NUMBER_OF_POINTS = 6
-SEARCH_FOR_PYLON_PATH = [(0.6, 0)] + [
+PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
+PYLON_SEARCH_RADIUS = 2
+PYLON_SEARCH_POINT_COUNT = 6
+PYLON_SEARCH_PATH = [(0.6, 0)] + [
     (
-        PATH_RADIUS * math.cos(i * 2 * math.pi / PATH_NUMBER_OF_POINTS), 
-        PATH_RADIUS * math.sin(i * 2 * math.pi / PATH_NUMBER_OF_POINTS)
-    ) for i in range(PATH_NUMBER_OF_POINTS)
+        PYLON_SEARCH_RADIUS * math.cos(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT), 
+        PYLON_SEARCH_RADIUS * math.sin(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT)
+    ) for i in range(PYLON_SEARCH_POINT_COUNT)
 ]
-PYLON_TARGET_DISTANCE = 0.8
 
 class Algorithm:
     def __init__(self) -> None:
@@ -101,6 +94,10 @@ class Algorithm:
         self._wait_for_odometry()
         print('First point cloud and odometry recieved ...')
 
+        EXIT_FREE_SPACE_THRESHOLD = 0.50
+        MIN_GARAGE_GATE_ANGLE = 0.75  # [rad]
+        EXIT_CAMERA_YAW_OFFSET = 0.2  # [rad]
+
         print("Finding exit")
         while not self._is_stopping():
             # get point cloud
@@ -123,7 +120,7 @@ class Algorithm:
             if data.size > 50:
                 dist = np.percentile(data, 10)
             else:
-                self.robot.cmd_velocity(0, MINIMAL_ANGULAR_VELOCITY) # fallback if pointcloud data are horrible
+                self.robot.cmd_velocity(0, MIN_ROTATION_SPEED) # fallback if pointcloud data are horrible
                 continue
 
             current_odom = self.robot.get_odometry()
@@ -134,24 +131,24 @@ class Algorithm:
 
             # [1] - find exit approximetly
             if not found_exit_roughly:
-                self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
-                if dist >= FREE_SPACE_DISTANCE_THRESHOLD:
+                self.robot.cmd_velocity(0, GARAGE_EXIT_ROTATION_SPEED)
+                if dist >= EXIT_FREE_SPACE_THRESHOLD:
                     print("Found the exit roughly")
                     found_exit_roughly = True
 
             # [2] - we dont even have the first angle
             elif first_wall_end_yaw is None:
-                self.robot.cmd_velocity(0, EXIT_ANGULAR_VELOCITY)
-                if dist <= FREE_SPACE_DISTANCE_THRESHOLD:
+                self.robot.cmd_velocity(0, GARAGE_EXIT_ROTATION_SPEED)
+                if dist <= EXIT_FREE_SPACE_THRESHOLD:
                     first_wall_end_yaw = current_yaw
                     print(f"First wall found at yaw={first_wall_end_yaw:.2f}")
 
 
             # [2] - we have the first yaw, but not the second one
             elif second_wall_yaw is None:
-                self.robot.cmd_velocity(0, -EXIT_ANGULAR_VELOCITY) # rotate counterclockwise
+                self.robot.cmd_velocity(0, -GARAGE_EXIT_ROTATION_SPEED) # rotate counterclockwise
                 # Check that we turned far enough away from first edge
-                if dist <= FREE_SPACE_DISTANCE_THRESHOLD and abs(normalize_angle(first_wall_end_yaw - current_yaw)) > MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE:
+                if dist <= EXIT_FREE_SPACE_THRESHOLD and abs(normalize_angle(first_wall_end_yaw - current_yaw)) > MIN_GARAGE_GATE_ANGLE:
                     second_wall_yaw = current_yaw
                     print(f"Second wall found at yaw={second_wall_yaw:.2f}")
 
@@ -164,7 +161,7 @@ class Algorithm:
                 if first_wall_end_yaw < second_wall_yaw:
                     mid_yaw += math.pi
 
-                delta_to_mid = normalize_angle(mid_yaw - second_wall_yaw + CAMERA_ANGULAR_OFFSET) # To compensate for the fact that the camera does not head straight ahead
+                delta_to_mid = normalize_angle(mid_yaw - second_wall_yaw + EXIT_CAMERA_YAW_OFFSET) # To compensate for the fact that the camera does not head straight ahead
 
                 print(f"Rotating towards middle of exit: {mid_yaw:.2f}")
 
@@ -188,7 +185,7 @@ class Algorithm:
         Returns:
             None
         """
-        for point in SEARCH_FOR_PYLON_PATH:
+        for point in PYLON_SEARCH_PATH:
             if not self._go_to_point_using_odometry(*point):
                 print(f"Driving to point ({point[0]:.2f}, {point[1]:.2f}) failed")
                 return
@@ -213,6 +210,7 @@ class Algorithm:
                 False if the robot was interrupted or the pylon was not found.
         """
         self._wait_for_new_data()
+        PYLON_APPROACH_DISTANCE = 0.8
 
         odom = self.robot.get_odometry()
         if odom is None:
@@ -306,9 +304,9 @@ class Algorithm:
             # ak máme validnú vzdialenosť
             if distance is not None and not np.isnan(distance):
                 # riadenie dopredného pohybu    
-                print(f"distance: {distance:.2f}, x_pixel_error: {x_pixel_error:.2f}, target_distace: {PYLON_TARGET_DISTANCE:.2f}")
+                print(f"distance: {distance:.2f}, x_pixel_error: {x_pixel_error:.2f}, target_distace: {PYLON_APPROACH_DISTANCE:.2f}")
                 print(f"pixel_angular: {angular_pixel_error:.2f}, garage_angular: {angular_avoid_garage:.2f}, total: {angular:.2f}")
-                if distance > PYLON_TARGET_DISTANCE:
+                if distance > PYLON_APPROACH_DISTANCE:
                     print("Going after target")
                     linear = 0.1
                 else:
@@ -379,7 +377,7 @@ class Algorithm:
 
         # Convert to global frame
         points_global = []
-        for x, y in PATH_AROUND_PYLON:
+        for x, y in PYLON_AROUND_PATH:
             x_transformed, y_transformed = local_coords_to_global_coords(x, y, start_odom)
             points_global.append((x_transformed, y_transformed))
 
@@ -517,7 +515,7 @@ class Algorithm:
             print(f"right globally: {pillar_2}")
 
             garage_gate = average_vector(pillar_1, pillar_2)
-            garage_gate = extend_vector(garage_gate, DISTANCE_TOL) # go a bit further to compensate for DISTANCE_TOL
+            garage_gate = extend_vector(garage_gate, GOAL_DISTANCE_TOLERANCE) # go a bit further to compensate for tolerance
             print(f"garage_gate: {garage_gate}")
 
             if not self._go_to_point_using_odometry(*garage_gate):
@@ -574,6 +572,7 @@ class Algorithm:
         print("Parking into garage")
         self.robot.reset_odometry()
         self._wait_for_new_data()  
+        GARAGE_PARKING_LINEAR_SPEED = 0.05
 
         dest_x = 10        # Tell the robot to go straight
         dest_y = 0
@@ -617,11 +616,11 @@ class Algorithm:
 
             # Proportional angular correction
             angular = 0.5 * angle_error
-            angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # Clamp
+            angular = max(min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED)  # Clamp
 
             print(f"Distance: {dist:.2f}, thres: {GARAGE_WALL_DISTANCE:.2f}")
             if dist > GARAGE_WALL_DISTANCE:
-                self.robot.cmd_velocity(LINEAR_PARKING_VELOCITY, angular)
+                self.robot.cmd_velocity(GARAGE_PARKING_LINEAR_SPEED, angular)
             else:
                 self.robot.cmd_velocity(0, 0)
                 print("Parked into garage!")
@@ -645,7 +644,7 @@ class Algorithm:
         return self._go_to_point_using_odometry(*target_point)
 
 
-    def _rotate_by_angle(self,target_delta_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
+    def _rotate_by_angle(self,target_delta_yaw: float, angular_speed: float = DEFAULT_ROTATION_SPEED) -> bool:
         """
         Rotate the robot by a desired angular displacement using odometry feedback.
 
@@ -697,10 +696,10 @@ class Algorithm:
             angle_error = normalize_angle(target_delta_yaw - dyaw)
             # print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
 
-            angular = KP_ANG * angle_error   # proportional gain
-            angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # clamp
-            if -MINIMAL_ANGULAR_VELOCITY < angular < MINIMAL_ANGULAR_VELOCITY:
-                angular = MINIMAL_ANGULAR_VELOCITY if angular > 0 else -MINIMAL_ANGULAR_VELOCITY
+            angular = HEADING_KP * angle_error   # proportional gain
+            angular = max(min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED)  # clamp
+            if -MIN_ROTATION_SPEED < angular < MIN_ROTATION_SPEED:
+                angular = MIN_ROTATION_SPEED if angular > 0 else -MIN_ROTATION_SPEED
 
             self.robot.cmd_velocity(0, angular)
             angular_speed=angular
@@ -709,7 +708,7 @@ class Algorithm:
         return False
         
     
-    def _rotate_to_angle(self, target_yaw: float, angular_speed: float = ANGULAR_TO_THE_POINT) -> bool:
+    def _rotate_to_angle(self, target_yaw: float, angular_speed: float = DEFAULT_ROTATION_SPEED) -> bool:
         """
         Rotate the robot to an absolute yaw angle using odometry.
 
@@ -740,7 +739,7 @@ class Algorithm:
 
         return self._rotate_by_angle(target_delta_yaw, angular_speed)
 
-    def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = SPEED_TO_THE_POINT) -> bool:
+    def _drive_to_the_point(self, dest_x: float, dest_y: float, speed: float = DEFAULT_DRIVE_SPEED) -> bool:
         """
         Drive the robot toward a target 2D point using odometry-based feedback control.
 
@@ -792,13 +791,13 @@ class Algorithm:
             #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")
 
             # stop condition
-            if distance < DISTANCE_TOL:
+            if distance < GOAL_DISTANCE_TOLERANCE:
                 self.robot.cmd_velocity(0, 0)
                 return True
 
             # proportional angular correction
-            angular = KP_ANG * angle_error
-            angular = max(min(angular, ANGULAR_TO_THE_POINT_CLAMP), -ANGULAR_TO_THE_POINT_CLAMP)  # Clamp
+            angular = HEADING_KP * angle_error
+            angular = max(min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED)  # Clamp
 
             # optional: slow down when badly misaligned
             linear = speed
@@ -845,7 +844,7 @@ class Algorithm:
 
         current_x, current_y = current_odom[0], current_odom[1]
         distance = get_distance((current_x, current_y), (dest_x, dest_y))
-        if distance < DISTANCE_TOL:
+        if distance < GOAL_DISTANCE_TOLERANCE:
             print("Already at the point")
             return True
 
@@ -858,7 +857,7 @@ class Algorithm:
         delta_yaw = normalize_angle(target_angle - current_yaw)
 
         # ROtate towards point
-        angular_speed = ANGULAR_TO_THE_POINT if delta_yaw > 0 else -ANGULAR_TO_THE_POINT
+        angular_speed = DEFAULT_ROTATION_SPEED if delta_yaw > 0 else -DEFAULT_ROTATION_SPEED
         if not self._rotate_by_angle(delta_yaw, angular_speed=angular_speed):
             print("Rotating towards point failed.")
             return False
