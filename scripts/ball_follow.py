@@ -119,6 +119,8 @@ def main():
 CIRCULARITY_THRESHOLD = 0.52
 ASPECT_RATIO_LOWER_THRESHOLD = 0.65
 ASPECT_RATIO_UPPER_THRESHOLD = 1.55
+ASPECT_RATIO_STRICT_LOWER_THRESHOLD = 0.8
+ASPECT_RATIO_STRICT_UPPER_THRESHOLD = 1.25
 
 
 def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]:
@@ -133,6 +135,9 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((5,5), np.uint8))
 
+    # Apply the vertical offset: set top 80 rows to 0 (black)
+    mask[0:80, :] = 0
+
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     target_coords = None
@@ -141,31 +146,37 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
         # sort contours by area from largest to smallest
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         
+        passed_area_check = True
+        passed_circularity_check = True
+        passed_aspect_ratio_check = True
+
         for cnt in contours:
             area = cv2.contourArea(cnt)
-            if area < 330 or area > 2000:
-                continue
-
+            if area < 200 or area > 10000:
+                passed_area_check  = False
+            
+            aspect_ratio_lower = ASPECT_RATIO_STRICT_LOWER_THRESHOLD if area > 2000 else ASPECT_RATIO_LOWER_THRESHOLD
+            aspect_ratio_upper = ASPECT_RATIO_STRICT_UPPER_THRESHOLD if area > 2000 else ASPECT_RATIO_UPPER_THRESHOLD
             
             # check circularity(roundness) of the contour
             perimeter = cv2.arcLength(cnt, True)
             circularity = 4 * np.pi * area / (perimeter ** 2) if perimeter > 0 else 0
             
             if circularity < CIRCULARITY_THRESHOLD:
-                continue
+                passed_circularity_check = False
             
             # check the aspect ratio of the rectangle around the ball
             bx, by, w, h = cv2.boundingRect(cnt)
             aspect_ratio = w / h
             
-            if (aspect_ratio < ASPECT_RATIO_LOWER_THRESHOLD or aspect_ratio > ASPECT_RATIO_UPPER_THRESHOLD):
-                continue
+            if (aspect_ratio < aspect_ratio_lower or aspect_ratio > aspect_ratio_upper):
+                passed_aspect_ratio_check  = False
             
             ((x, y), radius) = cv2.minEnclosingCircle(cnt)
             x, y = int(x), int(y)
 
             # Save the coordinates of the largest contour (the first one processed)
-            if target_coords is None:
+            if target_coords is None and passed_area_check and passed_circularity_check and passed_aspect_ratio_check:
                 cv2.circle(frame_bgr, (x, y), 3, (0,0,255), -1)  
                 target_coords = (x, y)
 
@@ -173,8 +184,11 @@ def find_pylon(frame: np.ndarray) -> Tuple[Optional[Tuple[int, int]], np.ndarray
             cv2.circle(frame_bgr, (x, y), int(radius), (0,255,0), 2)
             
             # Put text next to the object with area (A) and circularity (C)
-            label = f"A:{area:.0f} C:{circularity:.2f}"
+            label = f"A:{area} C:{circularity:.2f}, R:{aspect_ratio:.2f}"
             cv2.putText(frame_bgr, label, (x + 10, y + 10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            checks = f"A:{passed_area_check} C: {passed_circularity_check}, R: {passed_aspect_ratio_check}"
+            cv2.putText(frame_bgr, checks, (x + 10, y + 25), 
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
     # Return the target coordinates (if any were found), the drawn frame, and the mask
