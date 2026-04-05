@@ -19,7 +19,7 @@ FREE_SPACE_DISTANCE_THRESHOLD = 0.50
 MINIMAL_GARAGE_GATE_ANGULAR_DISTANCE = 0.75 # [rad]
 CAMERA_ANGULAR_OFFSET = 0.2 # [rad]
 LINEAR_PARKING_VELOCITY = 0.05
-PATH_AROUND_PYLON = [(0.0,  0.35), (0.7, 0.35), (0.7, -0.35), (0.0, -0.35)]
+PATH_AROUND_PYLON = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 SEARCH_FOR_PYLON_PATH = [(0.2, 0.0), (1, 0), (1, 1.0), (0, 1.0), (-1.5, 1), (-1.5, 0), (-1.5, -1), (0, -1), (1, -1)]
 PYLON_TARGET_DISTANCE = 0.6 
 
@@ -37,7 +37,7 @@ class Algorithm:
         to successfully parking in the garage.
         """
         self.stop = False       
-        self.exit_garage()        
+        self.exit_garage()    
         self.approach_pylon()
         self.drive_around_pylon()
         self.return_to_garage()
@@ -262,9 +262,13 @@ class Algorithm:
                         column, row = pylon
                         pylon_pc = get_average_of_nearby_pixels(pc, row, column)
                         if pylon_pc is not None:
+                            odometry = self.robot.get_odometry()
                             distance = pylon_pc[2]
                             # We can drive a bit more forward, but the camera wont see the pylon anymore
-                            if not self._drive_forward(distance - 0.25):
+                            pylon_local = (pylon_pc[0], distance)
+                            target_point_local = extend_vector(pylon_local, -0.3)
+                            target_point = local_coords_to_global_coords(*target_point_local, odometry)
+                            if not self._go_to_point_using_odometry(*target_point):
                                 print("Driving closer to pylon failed")
                                 return False 
                             print("Robot successfully found and approached pylon")
