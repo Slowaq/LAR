@@ -752,7 +752,7 @@ class Algorithm:
                 self.trajectory.append((x, y))
 
             # distance to goal
-            distance = get_distance(current, [dest_x, dest_y])
+            distance = get_distance(current, (dest_x, dest_y))
 
             # desired heading
             desired_yaw = math.atan2(dest_y - y, dest_x - x)
