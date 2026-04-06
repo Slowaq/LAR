@@ -212,6 +212,7 @@ def local_coords_to_global_coords(
 
     x_rotated, y_rotated = rotate_vector(pc_x, pc_y, robot_yaw)
 
+    # Permutation of bases plus translation to robot global position
     point_global_x = robot_global_x + y_rotated
     point_global_y = robot_global_y - x_rotated     # sign changes
 
