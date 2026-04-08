@@ -16,10 +16,12 @@ def get_average_of_nearby_pixels(
         pc (np.ndarray): HxWx3 point cloud array.
         y (int): Pixel row coordinate.
         x (int): Pixel column coordinate.
-        window_size (int, optional): Odd number defining the window size. Defaults to 5.
+        window_size (int, optional): Odd number defining the window size.
+            Defaults to 5.
 
     Returns:
-        Optional[np.ndarray]: An array representing the [x, y, z] average, or None if no valid points are found.
+        Optional[np.ndarray]: An array representing the [x, y, z] average, or
+            None if no valid points are found.
     """
     half_w = window_size // 2
     h, w, _ = pc.shape
@@ -202,7 +204,8 @@ def local_coords_to_global_coords(
     Args:
         pc_x (float): The local x-coordinate.
         pc_y (float): The local y-coordinate.
-        odometry (np.ndarray): Array containing [robot_global_x, robot_global_y, robot_yaw].
+        odometry (np.ndarray): Array containing
+            [robot_global_x, robot_global_y, robot_yaw].
 
     Returns:
         Tuple[float, float]: The transformed (global_x, global_y) coordinates.
@@ -227,12 +230,15 @@ def global_coords_to_local_coords(
     Args:
         global_x (float): The global x-coordinate.
         global_y (float): The global y-coordinate.
-        odometry (np.ndarray): Array containing [robot_global_x, robot_global_y, robot_yaw].
+        odometry (np.ndarray): Array containing
+            [robot_global_x, robot_global_y, robot_yaw].
 
     Returns:
         Tuple[float, float]: The transformed (local_x, local_y) coordinates.
     """
-    robot_global_x, robot_global_y, robot_yaw = odometry[0], odometry[1], odometry[2]
+    robot_global_x, robot_global_y, robot_yaw = (
+        odometry[0], odometry[1], odometry[2]
+    )
 
     # 1. Translate back to robot-centric origin
     dx = global_x - robot_global_x

@@ -29,9 +29,12 @@ PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
 PYLON_SEARCH_PATH = [(0.6, 0)] + [
     (
-        PYLON_SEARCH_RADIUS * math.cos(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT),
-        PYLON_SEARCH_RADIUS * math.sin(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT)
-    ) for i in range(PYLON_SEARCH_POINT_COUNT)
+        PYLON_SEARCH_RADIUS
+        * math.cos(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT),
+        PYLON_SEARCH_RADIUS
+        * math.sin(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT),
+    )
+    for i in range(PYLON_SEARCH_POINT_COUNT)
 ]
 
 
@@ -50,8 +53,9 @@ class Algorithm:
         """
         Execute the full parking algorithm pipeline.
 
-        The method resets the robot state, exits the garage, searches for the pylon,
-        drives around it, and then returns the robot to the garage.
+        The method resets the robot state, exits the garage, and searches for
+        the pylon. It then drives around the pylon and returns the robot to the
+        garage.
 
         Returns:
             None
@@ -202,8 +206,9 @@ class Algorithm:
         """
         Visit predefined search points and attempt to detect the pylon.
 
-        The robot drives sequentially to points on the search path and scans for
-        the pylon from each location. If the pylon is found at any point, the
+        The robot drives sequentially to points on the search path and
+        scans for the pylon from each location. If the pylon is found at any
+        point, the method returns early.
         method returns early.
 
         Returns:
@@ -212,8 +217,9 @@ class Algorithm:
         for point in PYLON_SEARCH_PATH:
             if not self._go_to_point_using_odometry(*point):
                 print(
-                    f"Driving to point ({point[0]:.2f}, "
-                    f"{point[1]:.2f}) failed"
+                    "Driving to point ({:.2f}, {:.2f}) failed".format(
+                        point[0], point[1]
+                    )
                 )
                 return
             self.points_visited.append(point)
@@ -222,8 +228,8 @@ class Algorithm:
                 return
             else:
                 print(
-                    f"Couldnt find pylon from this position "
-                    f"- trying different point"
+                    "Couldnt find pylon from this position "
+                    "- trying different point"
                 )
         print("Couldnt find pylon at all")
 
@@ -270,7 +276,10 @@ class Algorithm:
             if abs(normalize_angle(initial_yaw - current_yaw)) > 0.5:
                 left_origin = True
 
-            if left_origin and abs(normalize_angle(initial_yaw - current_yaw)) < 0.2:
+            if (
+                left_origin
+                and abs(normalize_angle(initial_yaw - current_yaw)) < 0.2
+            ):
                 print("Robot did full circle and couldnt find pylon")
                 return False
 
@@ -306,14 +315,18 @@ class Algorithm:
 
                     angular_avoid_garage = 0.0
                     # 1. Is it in front of the robot? (y > -0.2)
-                    # 2. Is it in front of the pylon? (origin_local_y < distance)
-                    # 3. Is it close enough to care? (Within a 1.5m lookahead distance)
+                    # 2. Is it in front of the pylon?
+                    #    (origin_local_y < distance)
+                    # 3. Is it close enough to care?
+                    #    (Within a 1.5m lookahead distance)
                     # 4. Are we on a collision course? (abs(x) < 0.8)
                     if (
-                        origin_local_y > -0.2 and
-                        origin_local_y < distance and
-                        get_distance((origin_local_x, origin_local_y), (0, 0)) < 1.5 and
-                        abs(origin_local_x) < 0.8
+                        origin_local_y > -0.2
+                        and origin_local_y < distance
+                        and get_distance(
+                            (origin_local_x, origin_local_y), (0, 0)
+                        ) < 1.5
+                        and abs(origin_local_x) < 0.8
                     ):
 
                         robot_had_to_dodge_garage = True
@@ -323,8 +336,8 @@ class Algorithm:
                             1 * (0.8 - abs(origin_local_x)) / 0.8
                         )
 
-                        # If origin is to the right (x >= 0), steer left (+ angular).
-                        # If origin is to the left (x < 0), steer right (- angular).
+                        # If origin is to the right (x >= 0), steer left.
+                        # If origin is to the left (x < 0), steer right.
                         if origin_local_x >= 0:
                             angular_avoid_garage = avoidance_strength
                         else:
@@ -364,13 +377,15 @@ class Algorithm:
 
                     if pylon is not None:
                         column, row = pylon
-                        pylon_pc = get_average_of_nearby_pixels(pc, row, column)
+                        pylon_pc = get_average_of_nearby_pixels(
+                            pc, row, column
+                        )
                         if pylon_pc is not None:
                             odometry = self.robot.get_odometry()
                             if odometry is None:
-                                continue    # Only happens if robot got interrupted
+                                continue  # Only happens if interrupted
                             distance = pylon_pc[2]
-                            # We can drive a bit more forward, but 
+                            # We can drive a bit more forward, but
                             # the camera wont see the pylon anymore
                             pylon_local = (pylon_pc[0], distance)
                             target_point_local = extend_vector(
@@ -381,16 +396,23 @@ class Algorithm:
                             )
 
                             if robot_had_to_dodge_garage:
-                                # make sure robot avoid garage on its way back also
-                                midpoint = average_vector(target_point, initial_point)
+                                # Make sure the robot avoids the garage on its
+                                # way back also.
+                                midpoint = average_vector(
+                                    target_point, initial_point
+                                )
                                 midpoint = extend_vector(midpoint, 1)
                                 print(f"Added {midpoint} to path")
                                 self.points_visited.append(midpoint)
 
-                            if not self._go_to_point_using_odometry(*target_point):
+                            if not self._go_to_point_using_odometry(
+                                *target_point
+                            ):
                                 print("Driving closer to pylon failed")
                                 return False
-                            print("Robot successfully found and approached pylon")
+                            print(
+                                "Robot successfully found and approached pylon"
+                            )
                             return True
                     else:
                         print("ignoring halucination")
@@ -427,12 +449,16 @@ class Algorithm:
         # Convert to global frame
         points_global = []
         for x, y in PYLON_AROUND_PATH:
-            x_transformed, y_transformed = local_coords_to_global_coords(x, y, start_odom)
+            x_transformed, y_transformed = local_coords_to_global_coords(
+                x, y, start_odom
+            )
             points_global.append((x_transformed, y_transformed))
 
         # Execute path
         for x_transformed, y_transformed in points_global:
-            if not self._go_to_point_using_odometry(x_transformed, y_transformed):
+            if not self._go_to_point_using_odometry(
+                x_transformed, y_transformed
+            ):
                 break
 
     def return_to_garage(self) -> None:
@@ -457,16 +483,19 @@ class Algorithm:
         return
 
     def find_garage_pillars(self) -> List[Tuple[float, float, float]]:
-        """Spins the robot to scan for and locate the two purple garage pillars.
+        """Scan for and locate the two purple garage pillars.
 
-        The robot performs a 360-degree rotation, using RGB and point cloud data
+        The robot performs a 360-degree rotation using RGB and point cloud
+        data
         to identify the pillars. When a pillar is found, the robot stops to get
-        an accurate reading, calculates its global coordinates, and then resumes spinning.
+        an accurate reading, calculates its global coordinates, and resumes
+        spinning.
 
         Returns:
-            List[Tuple[float, float, float]]: A list containing the coordinates and
-            yaw of the found pillars in the format (global_x, global_y, center_yaw).
-            Returns an empty list if it does not find exactly 2 pillars.
+            List[Tuple[float, float, float]]: A list containing the coordinates
+                and yaw of the found pillars in the format
+                (global_x, global_y, center_yaw). Returns an empty list if it
+                does not find exactly 2 pillars.
         """
         print('Waiting for point cloud, RGB and odometry...')
         self._wait_for_new_data()
@@ -483,7 +512,8 @@ class Algorithm:
         total_rotated = 0.0
 
         # Do a circle and find purple pillars
-        # If the robot sees a purple pillar, it stops moving to get more accurate data
+        # If the robot sees a purple pillar, it stops moving to get
+        # more accurate data
         while not self._is_stopping():
             if not stop_spinning:
                 self.robot.cmd_velocity(0, 0.4)
@@ -523,7 +553,9 @@ class Algorithm:
                 delta_x = pillar_pc[0]
                 delta_y = pillar_pc[2]
 
-                delta_x, delta_y = rotate_vector(delta_x, delta_y, CAMERA_ANGULAR_OFFSET)
+                delta_x, delta_y = rotate_vector(
+                    delta_x, delta_y, CAMERA_ANGULAR_OFFSET
+                )
 
                 delta_yaw = math.atan2(delta_x, delta_y)
                 # Minus because of flipped y-axis compared to global system
@@ -560,7 +592,8 @@ class Algorithm:
         drives to that midpoint, and rotates to face into the garage.
 
         Returns:
-            bool: True if the rotation to the target angle is successful, False otherwise.
+            bool: True if the rotation to the target angle is successful,
+                False otherwise.
         """
         print("Looking for garage entrance")
 
@@ -570,7 +603,8 @@ class Algorithm:
             pillar_1 = pillars[1][:2]
             pillar_2 = pillars[0][:2]
 
-            # Get garage midpoint (everything is already in global coordinate space)
+            # Get the garage midpoint (everything is already in global
+            # coordinate space)
             print(f"left globally: {pillar_1}")
             print(f"right globally: {pillar_2}")
 
@@ -611,7 +645,8 @@ class Algorithm:
         to begin searching for the entrance and driving straight in.
 
         Returns:
-            bool: True if it successfully reaches the approach point and rotates, False otherwise.
+            bool: True if it successfully reaches the approach point and
+                rotates, False otherwise.
         """
         for point in self.points_visited[::-1]:
             # Get in front of garage approximately using odometry
@@ -622,12 +657,13 @@ class Algorithm:
     def drive_into_garage(self) -> bool:
         """Drives the robot straight into the garage using point cloud data.
 
-        The robot utilizes depth data to move forward until it reaches a
-        specified distance from the back wall. It assumes the robot is already
-        centered between the pillars and facing the wall.
+        The robot uses depth data to move forward until it reaches a specified
+        distance from the back wall. It assumes the robot is already centered
+        between the pillars and facing the wall.
 
         Returns:
-            bool: True if successfully parked, False if interrupted or if it fails.
+            bool: True if successfully parked, False if interrupted or if it
+                fails.
         """
         print(
             f"Driving into garage to a distance of "
@@ -635,7 +671,8 @@ class Algorithm:
         )
 
         # Rotate towards garage
-        # We assume the robot is standing on the axis between the purple pillars
+        # We assume the robot is standing on the axis between the
+        # purple pillars
 
         print("Parking into garage")
         self.robot.reset_odometry()
@@ -684,7 +721,9 @@ class Algorithm:
 
             # Proportional angular correction
             angular = 0.5 * angle_error
-            angular = max(min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED)  # Clamp
+            angular = max(
+                min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED
+            )  # Clamp
 
             print(f"Distance: {dist:.2f}, thres: {GARAGE_WALL_DISTANCE:.2f}")
             if dist > GARAGE_WALL_DISTANCE:
@@ -699,7 +738,8 @@ class Algorithm:
 
     def _drive_forward(self, distance: float) -> bool:
         """
-        Helper method. Drives given distance (in meters) forward using odometry.
+        Helper method. Drives given distance (in meters) forward using
+        odometry.
 
         Returns:
             bool: True if the forward drive completed, False if interrupted.
@@ -720,26 +760,30 @@ class Algorithm:
         Rotate the robot by a desired angular displacement using
         odometry feedback.
 
-        This method performs a closed-loop rotation based on the robot's current yaw.
-        A proportional controller is used to smoothly approach the target angle while
-        reducing speed near the goal. The rotation stops when the angular error is
+        This method performs a closed-loop rotation based on the robot's
+        current yaw. A proportional controller is used to smoothly approach
+        the target angle while reducing speed near the goal. The rotation stops
+        when the angular error is within a small tolerance.
         within a small tolerance.
 
         Parameters
         ----------
         target_delta_yaw : float
-            Desired change in orientation (yaw) in radians. Positive values correspond
-            to counterclockwise rotation, negative values to clockwise rotation.
+            Desired change in orientation (yaw) in radians.
+            Positive values correspond to counterclockwise rotation, negative
+            values to clockwise rotation.
 
         angular_speed : float, optional
-            Initial angular velocity in radians per second. This value is dynamically
-            adjusted by the proportional controller during execution.
+            Initial angular velocity in radians per second. This value is
+            dynamically adjusted by the proportional controller during
+            execution.
 
         Returns
         -------
         bool
-            True if the rotation was successfully completed, False if interrupted
-            (e.g., due to shutdown, stop flag, or missing odometry data).
+            True if the rotation was successfully completed, False if
+            interrupted (e.g., due to shutdown, stop flag, or missing odometry
+            data).
         """
         print(
             f"Rotaing by {target_delta_yaw:.2f} with angular speed "
@@ -769,12 +813,18 @@ class Algorithm:
 
             # slow down near the end of rotation
             angle_error = normalize_angle(target_delta_yaw - dyaw)
-            # print(f"start_yaw={start_yaw:.2f}, current_yaw={odom[2]:.2f}, dyaw={dyaw:.2f}, target_dyaw={target_delta_yaw:.2f}, angle_error={angle_error:.2f}")
+            # Debug: print rotation progress
 
             angular = HEADING_KP * angle_error   # proportional gain
-            angular = max(min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED)  # clamp
+            angular = max(
+                min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED
+            )  # clamp
             if -MIN_ROTATION_SPEED < angular < MIN_ROTATION_SPEED:
-                angular = MIN_ROTATION_SPEED if angular > 0 else -MIN_ROTATION_SPEED
+                angular = (
+                    MIN_ROTATION_SPEED
+                    if angular > 0
+                    else -MIN_ROTATION_SPEED
+                )
 
             self.robot.cmd_velocity(0, angular)
             angular_speed = angular
@@ -826,9 +876,10 @@ class Algorithm:
         """
         Drive the robot toward a target 2D point using odometry feedback.
 
-        The robot continuously adjusts its heading using a proportional angular controller
-        to stay aligned with the target point while moving forward. If the heading error
-        becomes too large, the robot temporarily stops forward motion and rotates in place
+        The robot continuously adjusts its heading using a proportional
+        angular controller to stay aligned with the target point while moving
+        forward. If the heading error becomes too large, the robot temporarily
+        stops forward motion and rotates in place to correct its orientation.
         to correct its orientation.
 
         Parameters
@@ -840,14 +891,15 @@ class Algorithm:
             Target y-coordinate in the world frame.
 
         speed : float, optional
-            Desired linear velocity in meters per second when the robot is sufficiently
-            aligned with the target direction.
+            Desired linear velocity in meters per second when the robot is
+            sufficiently aligned with the target direction.
 
         Returns
         -------
         bool
-            True if the robot reaches the target within the specified distance tolerance,
-            False if interrupted (e.g., stop flag or shutdown signal).
+            True if the robot reaches the target within the specified distance
+            tolerance, False if interrupted (e.g., stop flag or shutdown
+            signal).
         """
         print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
 
@@ -880,7 +932,9 @@ class Algorithm:
 
             # proportional angular correction
             angular = HEADING_KP * angle_error
-            angular = max(min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED)  # Clamp
+            angular = max(
+                min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED
+            )  # Clamp
 
             # optional: slow down when badly misaligned
             linear = speed
@@ -892,17 +946,20 @@ class Algorithm:
         self.robot.cmd_velocity(0, 0)
         return False
 
-    def _go_to_point_using_odometry(self, dest_x: float, dest_y: float) -> bool:
+    def _go_to_point_using_odometry(
+        self, dest_x: float, dest_y: float
+    ) -> bool:
         """
-        Navigate the robot to a target 2D point using a two-phase odometry-based strategy.
+        Navigate the robot to a target 2D point using a two-phase
+        odometry-based strategy.
 
         The navigation consists of:
         1. Rotating the robot to face the target point.
         2. Driving toward the target while maintaining alignment.
 
-        This process relies entirely on odometry feedback and uses helper methods
-        for rotation and translation. The function exits early if any step fails
-        or if execution is interrupted.
+        This process relies entirely on odometry feedback and uses helper
+        methods for rotation and translation. The function exits early if any
+        step fails or if execution is interrupted.
 
         Parameters
         ----------
@@ -915,8 +972,8 @@ class Algorithm:
         Returns
         -------
         bool
-            True if the robot successfully reaches the destination, False if any
-            step fails or the operation is interrupted.
+            True if the robot successfully reaches the destination,
+            False if any step fails or the operation is interrupted.
         """
         print(f"Driving to point: ({dest_x:.2f}, {dest_y:.2f})")
 
@@ -940,7 +997,11 @@ class Algorithm:
         delta_yaw = normalize_angle(target_angle - current_yaw)
 
         # ROtate towards point
-        angular_speed = DEFAULT_ROTATION_SPEED if delta_yaw > 0 else -DEFAULT_ROTATION_SPEED
+        angular_speed = (
+            DEFAULT_ROTATION_SPEED
+            if delta_yaw > 0
+            else -DEFAULT_ROTATION_SPEED
+        )
         if not self._rotate_by_angle(delta_yaw, angular_speed=angular_speed):
             print("Rotating towards point failed.")
             return False
