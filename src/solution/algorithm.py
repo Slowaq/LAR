@@ -404,11 +404,11 @@ class Algorithm:
                                 *target_point_local, odometry
                             )
                             self.pylon_position = local_coords_to_global_coords(
-                                pylon_local, odometry
+                                *pylon_local, odometry
                             )
 
                             if not self._go_to_point_using_odometry(
-                                *target_point, odometry
+                                *target_point
                             ):
                                 print("Driving closer to pylon failed")
                                 return False
