@@ -362,22 +362,9 @@ class Algorithm:
 
             # ak máme validnú vzdialenosť
             if distance is not None and not np.isnan(distance):
-                # riadenie dopredného pohybu
-                print(
-                    f"distance: {distance:.2f}, "
-                    f"x_pixel_error: {x_pixel_error:.2f}, "
-                    f"target_distace: {PYLON_APPROACH_DISTANCE:.2f}"
-                )
-                print(
-                    f"pixel_angular: {angular_pixel_error:.2f}, "
-                    f"garage_angular: {angular_avoid_garage:.2f}, "
-                    f"total: {angular:.2f}"
-                )
                 if distance > PYLON_APPROACH_DISTANCE:
-                    print("Going after target")
                     linear = 0.1
                 else:
-                    print("Close enough to the target - confirming the pylon")
                     self.robot.cmd_velocity(0, 0)   # Wait for accurate reading
                     self._wait_for_new_data()
                     rgb_image = self.robot.get_rgb_image()
@@ -417,15 +404,12 @@ class Algorithm:
                             )
                             return True
                     else:
-                        print("ignoring halucination")
                         angular = 0.4
 
             # Nemame validni vzdalenost - tocime se na miste a hledame pylon
             else:
                 pass
-                print("Distance is None - searching for pylon")
 
-            print(f"linear={linear:.2f}, angular={angular:.2f}\n")
             self.robot.cmd_velocity(linear=linear, angular=angular)
 
         # End while - robot was interrupted
