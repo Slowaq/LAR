@@ -747,7 +747,7 @@ class Algorithm:
         point cloud data.
         
         Returns:
-            bool: True if there is free space ahead
+            bool: True if there is free space
         """
         self.robot.cmd_velocity(0, 0)
         self._wait_for_point_cloud()
@@ -769,8 +769,7 @@ class Algorithm:
         if data.size > 50:
             dist = np.percentile(data, 10)
             print(f"Free distance: {dist:.3f} m")
-            if dist > 1.3:
-                return True
+            return dist > 1.3
         else:
             return False
 
