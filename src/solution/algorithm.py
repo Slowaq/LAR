@@ -743,8 +743,8 @@ class Algorithm:
             pc = self.robot.get_point_cloud()
 
             # mask out floor points and points too high
-            mask = pc[:, :, 1] < 0.2
-            mask = np.logical_and(mask, pc[:, :, 1] > -0.1)
+            mask = pc[:, :, 1] < 0.5
+            mask = np.logical_and(mask, pc[:, :, 1] > -0.0)
 
             # mask point that are not in front of the robot
             mask = np.logical_and(mask, pc[:, :, 0] < 0.3)
