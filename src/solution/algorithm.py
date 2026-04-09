@@ -466,7 +466,7 @@ class Algorithm:
                 break
 
     def return_to_garage(self) -> None:
-        """Executes the complete sequence to park the robot in the garage.
+        """Execute the complete sequence to park the robot in the garage.
 
         The robot sequentially approaches the garage, locates the entrance,
         and drives inside to park.
@@ -490,14 +490,13 @@ class Algorithm:
         """Scan for and locate the two purple garage pillars.
 
         The robot performs a 360-degree rotation using RGB and point cloud
-        data
-        to identify the pillars. When a pillar is found, the robot stops to get
-        an accurate reading, calculates its global coordinates, and resumes
-        spinning.
+        data to identify the pillars. When a pillar is found, the robot stops
+        to get an accurate reading, calculates its global coordinates, and
+        resumes spinning.
 
         Returns:
-            List[Tuple[float, float, float]]: A list containing the coordinates
-                and yaw of the found pillars in the format
+            List[Tuple[float, float, float]]: A list containing the
+                coordinates and yaw of the found pillars in the format
                 (global_x, global_y, center_yaw). Returns an empty list if it
                 does not find exactly 2 pillars.
         """
@@ -590,10 +589,10 @@ class Algorithm:
             return []
 
     def find_garage_entrance(self) -> bool:
-        """Locates the garage entrance and positions the robot to enter.
+        """Locate the garage entrance and position the robot to enter.
 
-        The robot calculates the midpoint between the two found pillars,
-        drives to that midpoint, and rotates to face into the garage.
+        Calculate the midpoint between the two found pillars, drive to that
+        midpoint, and rotate to face into the garage.
 
         Returns:
             bool: True if the rotation to the target angle is successful,
@@ -660,7 +659,7 @@ class Algorithm:
         return self._rotate_to_angle(math.pi)
 
     def drive_into_garage(self) -> bool:
-        """Drives the robot straight into the garage using point cloud data.
+        """Drive the robot straight into the garage using point cloud data.
 
         The robot uses depth data to move forward until it reaches a specified
         distance from the back wall. It assumes the robot is already centered
@@ -742,12 +741,11 @@ class Algorithm:
         return False
 
     def _is_space_in_front_of_robot_clear(self) -> bool:
-        """
-        Check if the space in front of the robot is clear using
+        """Check if the space in front of the robot is clear using
         point cloud data.
 
         Returns:
-            bool: True if there is free space
+            bool: True if there is free space.
         """
         self.robot.cmd_velocity(0, 0)
         self._wait_for_point_cloud()
@@ -835,34 +833,25 @@ class Algorithm:
         target_delta_yaw: float,
         go_fast: bool = False
     ) -> bool:
-        """
-        Rotate the robot by a desired angular displacement using
+        """Rotate the robot by a desired angular displacement using
         odometry feedback.
 
         This method performs a closed-loop rotation based on the robot's
         current yaw. A proportional controller is used to smoothly approach
-        the target angle while reducing speed near the goal. The rotation stops
-        when the angular error is within a small tolerance.
-        within a small tolerance.
+        the target angle while reducing speed near the goal. The rotation
+        stops when the angular error is within a small tolerance.
 
-        Parameters
-        ----------
-        target_delta_yaw : float
-            Desired change in orientation (yaw) in radians.
-            Positive values correspond to counterclockwise rotation, negative
-            values to clockwise rotation.
+        Args:
+            target_delta_yaw (float): Desired change in orientation (yaw) in
+                radians. Positive values correspond to counterclockwise
+                rotation, negative values to clockwise rotation.
+            go_fast (bool, optional): If True, use higher angular speed and
+                limits when rotating. Defaults to False.
 
-        angular_speed : float, optional
-            Initial angular velocity in radians per second. This value is
-            dynamically adjusted by the proportional controller during
-            execution.
-
-        Returns
-        -------
-        bool
-            True if the rotation was successfully completed, False if
-            interrupted (e.g., due to shutdown, stop flag, or missing odometry
-            data).
+        Returns:
+            bool: True if the rotation was successfully completed, False if
+                interrupted (e.g., due to shutdown, stop flag, or missing
+                odometry data).
         """
         print(
             f"Rotaing by {target_delta_yaw:.2f} radians "
@@ -912,18 +901,14 @@ class Algorithm:
     def _rotate_to_angle(
         self, target_yaw: float
     ) -> bool:
-        """
-        Rotate the robot to an absolute yaw angle using odometry.
+        """Rotate the robot to an absolute yaw angle using odometry.
 
-        Parameters
-        ----------
-        target_yaw : float
-            Desired absolute orientation (yaw) in radians.
+        Args:
+            target_yaw (float): Desired absolute orientation (yaw) in
+                radians.
 
-        Returns
-        -------
-        bool
-            True if rotation completed successfully, False otherwise.
+        Returns:
+            bool: True if rotation completed successfully, False otherwise.
         """
         self._wait_for_odometry()
         odom = self.robot.get_odometry()
@@ -946,33 +931,24 @@ class Algorithm:
         self, dest_x: float, dest_y: float,
         speed: float = DEFAULT_DRIVE_SPEED
     ) -> bool:
-        """
-        Drive the robot toward a target 2D point using odometry feedback.
+        """Drive the robot toward a target 2D point using odometry feedback.
 
         The robot continuously adjusts its heading using a proportional
         angular controller to stay aligned with the target point while moving
-        forward. If the heading error becomes too large, the robot temporarily
-        stops forward motion and rotates in place to correct its orientation.
-        to correct its orientation.
+        forward. If the heading error becomes too large, the robot stops
+        forward motion and rotates in place to correct its orientation.
 
-        Parameters
-        ----------
-        dest_x : float
-            Target x-coordinate in the world frame.
+        Args:
+            dest_x (float): Target x-coordinate in the world frame.
+            dest_y (float): Target y-coordinate in the world frame.
+            speed (float, optional): Desired linear velocity in meters per
+                second when the robot is sufficiently aligned with the target
+                direction. Defaults to DEFAULT_DRIVE_SPEED.
 
-        dest_y : float
-            Target y-coordinate in the world frame.
-
-        speed : float, optional
-            Desired linear velocity in meters per second when the robot is
-            sufficiently aligned with the target direction.
-
-        Returns
-        -------
-        bool
-            True if the robot reaches the target within the specified distance
-            tolerance, False if interrupted (e.g., stop flag or shutdown
-            signal).
+        Returns:
+            bool: True if the robot reaches the target within the specified
+                distance tolerance, False if interrupted (e.g., stop flag or
+                shutdown signal).
         """
         print(f"Driving straight to point: ({dest_x:.2f}, {dest_y:.2f})")
 
@@ -1023,36 +999,26 @@ class Algorithm:
         dest_y: float,
         go_fast: bool = False
     ) -> bool:
-        """
-        Navigate the robot to a target 2D point using a two-phase
-        odometry-based strategy.
+        """Navigate to a target 2D point using a two-phase odometry strategy.
 
         The navigation consists of:
         1. Rotating the robot to face the target point.
         2. Driving toward the target while maintaining alignment.
 
         This process relies entirely on odometry feedback and uses helper
-        methods for rotation and translation. The function exits early if any
-        step fails or if execution is interrupted.
+        methods for rotation and translation. Exits early if any step fails
+        or if execution is interrupted.
 
-        Parameters
-        ----------
-        dest_x : float
-            Target x-coordinate in the world frame.
+        Args:
+            dest_x (float): Target x-coordinate in the world frame.
+            dest_y (float): Target y-coordinate in the world frame.
+            go_fast (bool, optional): If True, use higher linear and angular
+                speed when driving toward the target. Faster, but less
+                accurate. Defaults to False.
 
-        dest_y : float
-            Target y-coordinate in the world frame.
-
-        go_fast : bool, optional
-            If True, the robot will use a higher linear and angular speed when
-            driving toward the target point. Faster, but less accurate. Default
-            is False.
-
-        Returns
-        -------
-        bool
-            True if the robot successfully reaches the destination,
-            False if any step fails or the operation is interrupted.
+        Returns:
+            bool: True if the robot successfully reaches the destination,
+                False if any step fails or the operation is interrupted.
         """
         print(f"Driving to point: ({dest_x:.2f}, {dest_y:.2f})")
 
