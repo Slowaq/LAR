@@ -28,7 +28,7 @@ GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
-PYLON_SEARCH_PATH = [(0.7, 0), (0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.6, -0.7)]
+PYLON_SEARCH_PATH = [(0.7, 0), (0.7, 0.7)] #, (-0.7, 0.7), (-0.7, -0.7), (0.6, -0.7)]
 
 
 class Algorithm:
