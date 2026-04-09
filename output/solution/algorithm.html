@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.0">
 <title>solution.algorithm API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Module implementing the main Algorithm class for TurtleBot navigation
+and tasks.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -25,6 +26,8 @@ hljs.highlightAll();
 <h1 class="title">Module <code>solution.algorithm</code></h1>
 </header>
 <section id="section-intro">
+<p>Module implementing the main Algorithm class for TurtleBot navigation
+and tasks.</p>
 </section>
 <section>
 </section>
@@ -39,22 +42,32 @@ hljs.highlightAll();
 <span>class <span class="ident">Algorithm</span></span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Main algorithm class for TurtleBot navigation, obstacle avoidance, and
+garage parking. Handles sensor data processing, path planning, and robot
+control for autonomous tasks including finding pylons, navigating to
+garages, and responding to bumper/button inputs.</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">class Algorithm:
+    &#34;&#34;&#34;Main algorithm class for TurtleBot navigation, obstacle avoidance, and
+    garage parking. Handles sensor data processing, path planning, and robot
+    control for autonomous tasks including finding pylons, navigating to
+    garages, and responding to bumper/button inputs.
+    &#34;&#34;&#34;
+
     def __init__(self) -&gt; None:
         self.robot: Turtlebot = Turtlebot(rgb=True, depth=True, pc=True)
+
         # When bumper hits or button pressed, the robot stops
         self.stop: bool = True
+
+        # Block start of another execution if B0 button was pressed again
         self.is_running: bool = False
-        # If true, robot trajectory is stored for debugging
-        self.record_trajectory: bool = False
-        # List to store the trajectory of the robot
-        self.trajectory: List[Tuple[float, float]] = []
-        self.safe_points: List[Tuple[float, float]] = CORNER_POINTS_AROUND_GARAGE[:]
+
+        self.safe_points: List[Tuple[float, float]] = \
+            CORNER_POINTS_AROUND_GARAGE[:]
         self.pylon_position: Optional[Tuple[float, float]] = None
 
     def run(self) -&gt; None:
@@ -69,9 +82,8 @@ hljs.highlightAll();
             None
         &#34;&#34;&#34;
         self.stop = False
-        self.points_visited = []
-        # self.exit_garage()
-        self.robot.reset_odometry()
+        self.points_visited: List[Tuple[float, float]] = []
+        self.exit_garage()
         self.approach_pylon()
         self.drive_around_pylon()
         self.return_to_garage()
@@ -219,12 +231,12 @@ hljs.highlightAll();
         The robot drives sequentially to points on the search path and
         scans for the pylon from each location. If the pylon is found at any
         point, the method returns early.
-        method returns early.
 
         Returns:
             None
         &#34;&#34;&#34;
-        stack_of_points = CORNER_POINTS_AROUND_GARAGE + [POINT_IN_FRONT_OF_GARAGE]
+        stack_of_points = CORNER_POINTS_AROUND_GARAGE + \
+            [POINT_IN_FRONT_OF_GARAGE]
         while stack_of_points:
             point = stack_of_points.pop()
             if not self._go_to_point_using_odometry(*point):
@@ -240,28 +252,28 @@ hljs.highlightAll();
                 return
             else:
                 print(
-                    &#34;Couldnt find pylon from this position &#34;
-                    &#34;- trying different point&#34;
+                    &#34;Couldn&#39;t find pylon from this position&#34;
                 )
-                if point in CORNER_POINTS_AROUND_GARAGE or point == POINT_IN_FRONT_OF_GARAGE:
+                in_g = point in CORNER_POINTS_AROUND_GARAGE
+                at_f = point == POINT_IN_FRONT_OF_GARAGE
+                if in_g or at_f:
                     target_yaw = math.atan2(point[1], point[0])
                     if not self._rotate_to_angle(target_yaw):
                         return
-                    print(&#34;Cheking if robot can go forward&#34;)
+                    print(&#34;Checking if robot can go forward&#34;)
                     if self._is_space_in_front_of_robot_clear():
                         print(&#34;Going forward since space is clear&#34;)
                         odometry = self.robot.get_odometry()
-                        new_point = local_coords_to_global_coords(0, 1.0, odometry)
+                        new_point = local_coords_to_global_coords(
+                            0, 1.0, odometry
+                        )
                         stack_of_points.append(new_point)
                         self.safe_points.append(new_point)
                     else:
                         print(&#34;Space in front of robot is not clear&#34;)
         else:
-            print(&#34;Couldnt find pylon at all&#34;)
+            print(&#34;Couldn&#39;t find pylon at all&#34;)
             self.stop = True
-            
-
-            
 
     def look_for_pylon(self) -&gt; bool:
         &#34;&#34;&#34;
@@ -282,7 +294,6 @@ hljs.highlightAll();
         if odom is None:
             return False
         initial_yaw = odom[2]
-        initial_point = (odom[0], odom[1])
         left_origin = False
 
         while not self._is_stopping():
@@ -406,10 +417,13 @@ hljs.highlightAll();
                                 pylon_local, -0.3
                             )
                             target_point = local_coords_to_global_coords(
-                                *target_point_local, odometry
+                                *target_point_local,
+                                odometry
                             )
-                            self.pylon_position = local_coords_to_global_coords(
-                                *pylon_local, odometry
+                            self.pylon_position = (
+                                local_coords_to_global_coords(
+                                    *pylon_local, odometry
+                                )
                             )
 
                             if not self._go_to_point_using_odometry(
@@ -743,7 +757,13 @@ hljs.highlightAll();
         return False
 
     def _is_space_in_front_of_robot_clear(self) -&gt; bool:
+        &#34;&#34;&#34;
+        Check if the space in front of the robot is clear using
+        point cloud data.
 
+        Returns:
+            bool: True if there is free space
+        &#34;&#34;&#34;
         self.robot.cmd_velocity(0, 0)
         self._wait_for_point_cloud()
 
@@ -764,12 +784,13 @@ hljs.highlightAll();
         if data.size &gt; 50:
             dist = np.percentile(data, 10)
             print(f&#34;Free distance: {dist:.3f} m&#34;)
-            if dist &gt; 1.3:
-                return True    
+            return dist &gt; 1.3
         else:
-            return None
+            return False
 
     def _get_path_to_garage(self) -&gt; List[Tuple[float, float]]:
+        &#34;&#34;&#34;Compute a path from current position to the garage using
+        graph-based pathfinding.&#34;&#34;&#34;
         self._wait_for_odometry()
         odom = self.robot.get_odometry()
         if odom is None:
@@ -778,24 +799,23 @@ hljs.highlightAll();
         self.safe_points.sort(
             key=lambda x: get_distance(x, current_point)
         )
-        start_point = self.safe_points[0] # closest point
+        start_point = self.safe_points[0]  # closest point
         target_point = POINT_IN_FRONT_OF_GARAGE
 
         graph = nx.Graph()
         for i, point_1 in enumerate(self.safe_points + [target_point]):
             rest_of_safe_points = self.safe_points[:i]
             for point_2 in rest_of_safe_points:
-                if line_intesects_circle(
-                    point_1,
-                    point_2,
-                    (0,0),   # origin
-                    0.69     # safe radius around garage   
+                if line_intersects_circle(
+                    point_1, point_2,
+                    (0, 0),   # origin
+                    0.69     # safe radius around garage
                 ):
                     continue
-                if line_intesects_circle(
+                if line_intersects_circle(
                     point_1,
                     point_2,
-                    self.pylon_position,
+                    self.pylon_position,  # type: ignore[arg-type]
                     0.3     # safe radius around pylon
                 ):
                     continue
@@ -805,7 +825,7 @@ hljs.highlightAll();
 
         # Get the shortest path
         path = nx.dijkstra_path(graph, source=start_point, target=target_point)
-        print(f&#34;Calculated path to garage:&#34;)
+        print(&#34;Calculated path to garage:&#34;)
         from pprint import pprint
         pprint(path)
         return path[1:]  # skip the first point since we are already there
@@ -873,8 +893,6 @@ hljs.highlightAll();
             odom = self.robot.get_odometry()
             if odom is None:
                 return False
-            if self.record_trajectory:
-                self.trajectory.append((odom[0], odom[1]))
 
             dyaw = normalize_angle(odom[2] - start_yaw)
 
@@ -980,8 +998,6 @@ hljs.highlightAll();
                 continue
 
             x, y, yaw = current
-            if self.record_trajectory:
-                self.trajectory.append((x, y))
 
             # distance to goal
             distance = get_distance(current, (dest_x, dest_y))
@@ -1017,8 +1033,8 @@ hljs.highlightAll();
         return False
 
     def _go_to_point_using_odometry(
-        self, 
-        dest_x: float, 
+        self,
+        dest_x: float,
         dest_y: float,
         go_fast: bool = False
     ) -&gt; bool:
@@ -1043,8 +1059,9 @@ hljs.highlightAll();
             Target y-coordinate in the world frame.
 
         go_fast : bool, optional
-            If True, the robot will use a higher linear and angular speed when driving
-            toward the target point. Faster, but less accurate. Default is False.
+            If True, the robot will use a higher linear and angular speed when
+            driving toward the target point. Faster, but less accurate. Default
+            is False.
 
         Returns
         -------
@@ -1073,7 +1090,7 @@ hljs.highlightAll();
         delta_yaw = normalize_angle(target_angle - current_yaw)
 
         if not self._rotate_by_angle(
-            delta_yaw, 
+            delta_yaw,
             go_fast=go_fast
         ):
             print(&#34;Rotating towards point failed.&#34;)
@@ -1178,8 +1195,7 @@ rotates, False otherwise.</dd>
 <div class="desc"><p>Visit predefined search points and attempt to detect the pylon.</p>
 <p>The robot drives sequentially to points on the search path and
 scans for the pylon from each location. If the pylon is found at any
-point, the method returns early.
-method returns early.</p>
+point, the method returns early.</p>
 <h2 id="returns">Returns</h2>
 <p>None</p></div>
 </dd>

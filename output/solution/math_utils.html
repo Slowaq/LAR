@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1">
 <meta name="generator" content="pdoc3 0.11.0">
 <title>solution.math_utils API documentation</title>
-<meta name="description" content="">
+<meta name="description" content="Utility functions for vector operations, coordinate transformations,
+and mathematical computations.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/sanitize.min.css" integrity="sha512-y1dtMcuvtTMJc1yPgEqF0ZjQbhnc/bFhyvIyVNb9Zk5mIGtqVaAB1Ttl28su8AvFMOY0EwRbAe+HCLqj6W7/KA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/13.0.0/typography.min.css" integrity="sha512-Y1DYSb995BAfxobCkKepB1BqJJTPrOp3zPL74AWFugHHmmdcvO+C48WLrUOlhGMc0QG7AE3f7gmvvcrmX2fDoA==" crossorigin>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/default.min.css" crossorigin>
@@ -25,6 +26,8 @@ hljs.highlightAll();
 <h1 class="title">Module <code>solution.math_utils</code></h1>
 </header>
 <section id="section-intro">
+<p>Utility functions for vector operations, coordinate transformations,
+and mathematical computations.</p>
 </section>
 <section>
 </section>
@@ -154,11 +157,11 @@ None if no valid points are found.</dd>
 <dd>The transformed (local_x, local_y) coordinates.</dd>
 </dl></div>
 </dd>
-<dt id="solution.math_utils.line_intesects_circle"><code class="name flex">
-<span>def <span class="ident">line_intesects_circle</span></span>(<span>point_1: Tuple[float, float], point_2: Tuple[float, float], circle_center: Tuple[float, float], radius: float) ‑> bool</span>
+<dt id="solution.math_utils.line_intersects_circle"><code class="name flex">
+<span>def <span class="ident">line_intersects_circle</span></span>(<span>point_1: Tuple[float, float], point_2: Tuple[float, float], circle_center: Tuple[float, float], radius: float) ‑> bool</span>
 </code></dt>
 <dd>
-<div class="desc"></div>
+<div class="desc"><p>Detect if a line segment intersects a circle.</p></div>
 </dd>
 <dt id="solution.math_utils.local_coords_to_global_coords"><code class="name flex">
 <span>def <span class="ident">local_coords_to_global_coords</span></span>(<span>pc_x: float, pc_y: float, odometry: np.ndarray) ‑> Tuple[float, float]</span>
@@ -265,7 +268,7 @@ None if no valid points are found.</dd>
 <li><code><a title="solution.math_utils.get_average_of_nearby_pixels" href="#solution.math_utils.get_average_of_nearby_pixels">get_average_of_nearby_pixels</a></code></li>
 <li><code><a title="solution.math_utils.get_distance" href="#solution.math_utils.get_distance">get_distance</a></code></li>
 <li><code><a title="solution.math_utils.global_coords_to_local_coords" href="#solution.math_utils.global_coords_to_local_coords">global_coords_to_local_coords</a></code></li>
-<li><code><a title="solution.math_utils.line_intesects_circle" href="#solution.math_utils.line_intesects_circle">line_intesects_circle</a></code></li>
+<li><code><a title="solution.math_utils.line_intersects_circle" href="#solution.math_utils.line_intersects_circle">line_intersects_circle</a></code></li>
 <li><code><a title="solution.math_utils.local_coords_to_global_coords" href="#solution.math_utils.local_coords_to_global_coords">local_coords_to_global_coords</a></code></li>
 <li><code><a title="solution.math_utils.multiply_vector" href="#solution.math_utils.multiply_vector">multiply_vector</a></code></li>
 <li><code><a title="solution.math_utils.normalize_angle" href="#solution.math_utils.normalize_angle">normalize_angle</a></code></li>
