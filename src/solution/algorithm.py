@@ -38,6 +38,7 @@ class Algorithm:
         self.robot: Turtlebot = Turtlebot(rgb=True, depth=True, pc=True)
         # When bumper hits or button pressed, the robot stops
         self.stop: bool = True
+        self.is_running: bool = False
         # If true, robot trajectory is stored for debugging
         self.record_trajectory: bool = False
         # List to store the trajectory of the robot
