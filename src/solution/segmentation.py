@@ -1,3 +1,5 @@
+"""Image segmentation utilities for detecting pylons and purple quads."""
+
 from __future__ import annotations
 
 import numpy as np

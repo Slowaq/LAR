@@ -1,3 +1,5 @@
+"""Utility functions for vector operations, coordinate transformations, and mathematical computations."""
+
 from __future__ import annotations
 
 import math
@@ -277,12 +279,13 @@ def clamp_speed(speed: float, max_speed: float, min_speed: float = 0.0) -> float
     else:
         return speed
 
-def line_intesects_circle(
+def line_intersects_circle(
         point_1: Tuple[float, float], 
         point_2: Tuple[float, float], 
         circle_center: Tuple[float, float],
         radius: float
     ) -> bool:
+    """Detect if a line segment intersects a circle."""
     x1, y1 = point_1
     x2, y2 = point_2
     xc, yc = circle_center

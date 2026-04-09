@@ -1,3 +1,5 @@
+"""Module implementing the main Algorithm class for TurtleBot navigation and tasks."""
+
 from robolab_turtlebot import Turtlebot, sleep
 from .segmentation import find_pylon, find_purple_quads
 from .math_utils import (
@@ -10,12 +12,12 @@ from .math_utils import (
     local_coords_to_global_coords,
     global_coords_to_local_coords,
     clamp_speed,
-    line_intesects_circle
+    line_intersects_circle
 )
 import numpy as np
 import math
-from typing import Tuple, List, Optional
 import networkx as nx
+from typing import Tuple, List, Optional
 
 GARAGE_EXIT_ROTATION_SPEED = 0.3
 GOAL_DISTANCE_TOLERANCE = 0.085
@@ -23,27 +25,31 @@ DEFAULT_DRIVE_SPEED = 0.2
 DEFAULT_ROTATION_SPEED = 0.9
 MAX_ROTATION_SPEED = 0.7
 MIN_ROTATION_SPEED = 0.2
-# Proportional gain for heading correction, proportional to angle error (rad)
 HEADING_KP = 5.0
-# Distance from wall when parking into garage (meters)
 GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
-PYLON_SEARCH_RADIUS = 2
-PYLON_SEARCH_POINT_COUNT = 6
 POINT_IN_FRONT_OF_GARAGE = (0.7, 0)
 CORNER_POINTS_AROUND_GARAGE = [(0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.7, -0.7)]
 
 class Algorithm:
+    """Main algorithm class for TurtleBot navigation, obstacle avoidance,
+    and garage parking.
+
+    Handles sensor data processing, path planning, and robot control for
+    autonomous tasks including finding pylons, navigating to garages, and
+    responding to bumper/button inputs.
+    """
     def __init__(self) -> None:
         self.robot: Turtlebot = Turtlebot(rgb=True, depth=True, pc=True)
+
         # When bumper hits or button pressed, the robot stops
         self.stop: bool = True
+
+        # Block start of another execution if B0 button was pressed again
         self.is_running: bool = False
-        # If true, robot trajectory is stored for debugging
-        self.record_trajectory: bool = False
-        # List to store the trajectory of the robot
-        self.trajectory: List[Tuple[float, float]] = []
-        self.safe_points: List[Tuple[float, float]] = CORNER_POINTS_AROUND_GARAGE[:]
+
+        self.safe_points: List[Tuple[float, float]] = \
+            CORNER_POINTS_AROUND_GARAGE[:]
         self.pylon_position: Optional[Tuple[float, float]] = None
 
     def run(self) -> None:
@@ -59,8 +65,7 @@ class Algorithm:
         """
         self.stop = False
         self.points_visited = []
-        # self.exit_garage()
-        self.robot.reset_odometry()
+        self.exit_garage()
         self.approach_pylon()
         self.drive_around_pylon()
         self.return_to_garage()
@@ -208,7 +213,6 @@ class Algorithm:
         The robot drives sequentially to points on the search path and
         scans for the pylon from each location. If the pylon is found at any
         point, the method returns early.
-        method returns early.
 
         Returns:
             None
@@ -229,14 +233,14 @@ class Algorithm:
                 return
             else:
                 print(
-                    "Couldnt find pylon from this position "
-                    "- trying different point"
+                    "Couldn't find pylon from this position - "
+                    "trying different point"
                 )
                 if point in CORNER_POINTS_AROUND_GARAGE or point == POINT_IN_FRONT_OF_GARAGE:
                     target_yaw = math.atan2(point[1], point[0])
                     if not self._rotate_to_angle(target_yaw):
                         return
-                    print("Cheking if robot can go forward")
+                    print("Checking if robot can go forward")
                     if self._is_space_in_front_of_robot_clear():
                         print("Going forward since space is clear")
                         odometry = self.robot.get_odometry()
@@ -271,7 +275,6 @@ class Algorithm:
         if odom is None:
             return False
         initial_yaw = odom[2]
-        initial_point = (odom[0], odom[1])
         left_origin = False
 
         while not self._is_stopping():
@@ -395,7 +398,8 @@ class Algorithm:
                                 pylon_local, -0.3
                             )
                             target_point = local_coords_to_global_coords(
-                                *target_point_local, odometry
+                                *target_point_local,
+                                odometry
                             )
                             self.pylon_position = local_coords_to_global_coords(
                                 *pylon_local, odometry
@@ -661,8 +665,7 @@ class Algorithm:
                 fails.
         """
         print(
-            f"Driving into garage to a distance of "
-            f"{GARAGE_WALL_DISTANCE:.2f} m from the wall."
+            f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall."
         )
 
         # Rotate towards garage
@@ -732,7 +735,7 @@ class Algorithm:
         return False
 
     def _is_space_in_front_of_robot_clear(self) -> bool:
-
+        """Check if the space in front of the robot is clear using point cloud data."""
         self.robot.cmd_velocity(0, 0)
         self._wait_for_point_cloud()
 
@@ -759,6 +762,7 @@ class Algorithm:
             return None
 
     def _get_path_to_garage(self) -> List[Tuple[float, float]]:
+        """Compute a path from current position to the garage using graph-based pathfinding."""
         self._wait_for_odometry()
         odom = self.robot.get_odometry()
         if odom is None:
@@ -767,21 +771,20 @@ class Algorithm:
         self.safe_points.sort(
             key=lambda x: get_distance(x, current_point)
         )
-        start_point = self.safe_points[0] # closest point
+        start_point = self.safe_points[0]  # closest point
         target_point = POINT_IN_FRONT_OF_GARAGE
 
         graph = nx.Graph()
         for i, point_1 in enumerate(self.safe_points + [target_point]):
             rest_of_safe_points = self.safe_points[:i]
             for point_2 in rest_of_safe_points:
-                if line_intesects_circle(
-                    point_1,
-                    point_2,
-                    (0,0),   # origin
+                if line_intersects_circle(
+                    point_1, point_2,
+                    (0, 0),   # origin
                     0.69     # safe radius around garage   
                 ):
                     continue
-                if line_intesects_circle(
+                if line_intersects_circle(
                     point_1,
                     point_2,
                     self.pylon_position,
@@ -1032,8 +1035,9 @@ class Algorithm:
             Target y-coordinate in the world frame.
 
         go_fast : bool, optional
-            If True, the robot will use a higher linear and angular speed when driving
-            toward the target point. Faster, but less accurate. Default is False.
+            If True, the robot will use a higher linear and angular speed when
+            driving toward the target point. Faster, but less accurate. Default
+            is False.
 
         Returns
         -------
