@@ -232,6 +232,9 @@ class Algorithm:
                     "- trying different point"
                 )
                 if point in CORNER_POINTS_AROUND_GARAGE or point == POINT_IN_FRONT_OF_GARAGE:
+                    target_yaw = math.atan2(point[1], point[0])
+                    if not self._rotate_to_angle(target_yaw):
+                        return
                     print("Cheking if robot can go forward")
                     if self._is_space_in_front_of_robot_clear():
                         print("Going forward since space is clear")
