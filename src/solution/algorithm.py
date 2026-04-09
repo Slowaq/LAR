@@ -66,8 +66,8 @@ class Algorithm:
         self.return_to_garage()
 
         if self.stop:
-            print("Algorithm exited early")
             self.robot.play_sound(1)
+            print("Algorithm exited early")
         else:
             self.robot.play_sound(0)
             print("Algorithm successfully finished")
@@ -245,9 +245,12 @@ class Algorithm:
                         self.safe_points.append(new_point)
                     else:
                         print("Space in front of robot is not clear")
+        else:
+            print("Couldnt find pylon at all")
+            self.stop = True
+            
 
             
-        print("Couldnt find pylon at all")
 
     def look_for_pylon(self) -> bool:
         """
