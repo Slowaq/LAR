@@ -290,7 +290,22 @@ def line_intersects_circle(
     circle_center: Tuple[float, float],
     radius: float
 ) -> bool:
-    """Detect if a line segment intersects a circle."""
+    """Detect if a line segment intersects a circle.
+
+    Use projection to find the closest point on the line segment to the
+    circle center. If the distance is within the radius, an intersection
+    exists.
+
+    Args:
+        point_1 (Tuple[float, float]): First endpoint of the line segment.
+        point_2 (Tuple[float, float]): Second endpoint of the line segment.
+        circle_center (Tuple[float, float]): Center of the circle.
+        radius (float): Radius of the circle.
+
+    Returns:
+        bool: True if the line segment intersects the circle, False
+            otherwise.
+    """
     x1, y1 = point_1
     x2, y2 = point_2
     xc, yc = circle_center

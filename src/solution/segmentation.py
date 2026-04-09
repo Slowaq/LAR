@@ -16,18 +16,21 @@ ASPECT_RATIO_STRICT_UPPER_THRESHOLD = 1.25
 def find_pylon(
     frame: np.ndarray
 ) -> Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]:
-    """
-    Detect the green pylon in an RGB frame.
+    """Detect the green pylon in an RGB frame.
+
+    Uses HSV color space filtering, morphological operations, and contour
+    analysis to find a green circular object. Returns pixel coordinates of
+    the detected center.
 
     Args:
         frame (np.ndarray): BGR image from the robot's camera.
 
     Returns:
-        tuple:
-            Optional[Tuple[int, int]]: pixel coordinates (column, row) of the
-                detected pylon center, or None if no pylon was found.
-            np.ndarray: visualization image with overlays drawn.
-            np.ndarray: binary mask used for the green detection.
+        Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]: A tuple
+            containing (center_coords, annotated_image, mask). center_coords
+            is None if no pylon was found, otherwise (column, row) pixel
+            coordinates. annotated_image is the visualization. mask is the
+            binary detection mask.
     """
     frame_bgr = frame.copy()
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
@@ -135,18 +138,21 @@ def find_pylon(
 def find_purple_quads(
     frame_bgr: np.ndarray
 ) -> Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]:
-    """
-    Detect purple rectangular quads in a BGR frame.
+    """Detect purple rectangular quads in a BGR frame.
+
+    Uses HSV color space filtering and shape validation to find purple
+    vertical rectangles. Filters by solidity and aspect ratio to reject
+    non-rectangular shapes.
 
     Args:
         frame_bgr (np.ndarray): BGR image from the robot's camera.
 
     Returns:
-        tuple:
-            List[Tuple[int, int]]: ordered list of quad center coordinates
-                as (column, row).
-            np.ndarray: annotated BGR image showing detections.
-            np.ndarray: binary mask of detected purple regions.
+        Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]: A tuple
+            containing (centers, annotated_image, mask). centers is a list
+            of (column, row) pixel coordinates for each detected quad.
+            annotated_image shows detections overlaid. mask is the binary
+            purple detection mask.
     """
     hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 

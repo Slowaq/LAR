@@ -15,11 +15,9 @@ BUTTON_B2 = 2
 
 
 def register_callbacks(algorithm: Algorithm) -> None:
-    """
-    Register bumper and button event callbacks on the robot with
-    threaded execution.
+    """Register bumper and button event callbacks on the robot.
 
-    The callbacks control the algorithm execution state:
+    Callbacks control the algorithm execution state with threaded execution:
     - Any bumper press sets the stop flag to True.
     - Button B0 triggers non-blocking execution in a background thread.
     - Button B1 sets the stop flag to True.
@@ -30,8 +28,7 @@ def register_callbacks(algorithm: Algorithm) -> None:
     """
 
     def _bumper_cb(msg: BumperEvent) -> None:
-        """
-        Handle bumper events to halt robot movement.
+        """Handle bumper events to halt robot movement.
 
         Args:
             msg (BumperEvent): Incoming bumper event message.
@@ -41,8 +38,7 @@ def register_callbacks(algorithm: Algorithm) -> None:
             algorithm.stop = True
 
     def _run_with_guard() -> None:
-        """
-        Thread worker that manages the algorithm lifecycle.
+        """Manage the algorithm lifecycle in a dedicated thread.
 
         Ensures the 'is_running' flag is cleared and the 'stop' flag is
         set upon completion or failure, allowing for subsequent restarts.
@@ -56,16 +52,16 @@ def register_callbacks(algorithm: Algorithm) -> None:
             algorithm.stop = True
 
     def _button_cb(msg: ButtonEvent) -> None:
-        """
-        Handle button events using a non-blocking threaded approach.
+        """Handle button events using a non-blocking threaded approach.
 
-        If the algorithm is already running, B0 events are discarded to prevent
-        ROS callback queueing from triggering multiple sequential runs. B1
-        remains active to allow user-interruption.
+        If the algorithm is already running, B0 events are discarded to
+        prevent ROS callback queueing from triggering multiple sequential
+        runs. B1 remains active to allow user-interruption.
 
         Args:
             msg (ButtonEvent): Incoming button event message.
         """
+
         if msg.state == STATE_PRESSED:
 
             # 1. Guard: If already running, handle stop signals or
