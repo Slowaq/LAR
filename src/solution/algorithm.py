@@ -8,18 +8,18 @@ from .math_utils import (
     average_vector,
     extend_vector,
     local_coords_to_global_coords,
-    global_coords_to_local_coords
+    global_coords_to_local_coords,
+    clamp_speed
 )
 import numpy as np
 import math
-import cv2
 from typing import Tuple, List
 
 GARAGE_EXIT_ROTATION_SPEED = 0.3
 GOAL_DISTANCE_TOLERANCE = 0.085
 DEFAULT_DRIVE_SPEED = 0.2
 DEFAULT_ROTATION_SPEED = 0.9
-MAX_ROTATION_SPEED = 1.5    # original: 0.7
+MAX_ROTATION_SPEED = 0.7
 MIN_ROTATION_SPEED = 0.2
 # Proportional gain for heading correction, proportional to angle error (rad)
 HEADING_KP = 5.0
@@ -28,7 +28,7 @@ GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
-PYLON_SEARCH_PATH = [(0.6, 0)] #, (0.6, 0.6), (-0.6, 0.6), (-0.6, -0.6), (0.6, -0.6)]
+PYLON_SEARCH_PATH = [(0.7, 0), (0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.6, -0.7)]
 
 
 class Algorithm:
@@ -531,10 +531,6 @@ class Algorithm:
 
             pillars, annotated_brg, image_bw = find_purple_quads(rgb_image)
 
-            cv2.imshow('Annotated BRG', annotated_brg)
-            cv2.imshow('Image BW', image_bw)
-            cv2.waitKey(1)
-
             if not pillars:
                 continue
 
@@ -577,8 +573,6 @@ class Algorithm:
                     # Wait for fresh point cloud and RGB data
                     stop_spinning = True
                     continue
-
-        cv2.destroyAllWindows()
 
         if len(found_pillars) == 2:
             return found_pillars
@@ -651,7 +645,7 @@ class Algorithm:
         """
         for point in self.points_visited[::-1]:
             # Get in front of garage approximately using odometry
-            if not self._go_to_point_using_odometry(*point):
+            if not self._go_to_point_using_odometry(*point, go_fast=True):
                 return False
         return self._rotate_to_angle(math.pi)
 
@@ -755,7 +749,7 @@ class Algorithm:
     def _rotate_by_angle(
         self,
         target_delta_yaw: float,
-        angular_speed: float = DEFAULT_ROTATION_SPEED
+        go_fast: bool = False
     ) -> bool:
         """
         Rotate the robot by a desired angular displacement using
@@ -787,8 +781,7 @@ class Algorithm:
             data).
         """
         print(
-            f"Rotaing by {target_delta_yaw:.2f} with angular speed "
-            f"{angular_speed:.2f}"
+            f"Rotaing by {target_delta_yaw:.2f} radians "
         )
 
         self._wait_for_odometry()
@@ -817,25 +810,25 @@ class Algorithm:
             # Debug: print rotation progress
 
             angular = HEADING_KP * angle_error   # proportional gain
-            angular = max(
-                min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED
-            )  # clamp
-            if -MIN_ROTATION_SPEED < angular < MIN_ROTATION_SPEED:
-                angular = (
-                    MIN_ROTATION_SPEED
-                    if angular > 0
-                    else -MIN_ROTATION_SPEED
-                )
+            max_angular = MAX_ROTATION_SPEED
+
+            if go_fast:
+                angular *= 1.5
+                max_angular *= 2
+
+            angular = clamp_speed(
+                angular,
+                max_speed=max_angular,
+                min_speed=MIN_ROTATION_SPEED
+            )
 
             self.robot.cmd_velocity(0, angular)
-            angular_speed = angular
 
         self.robot.cmd_velocity(0, 0)
         return False
 
     def _rotate_to_angle(
-        self, target_yaw: float,
-        angular_speed: float = DEFAULT_ROTATION_SPEED
+        self, target_yaw: float
     ) -> bool:
         """
         Rotate the robot to an absolute yaw angle using odometry.
@@ -844,9 +837,6 @@ class Algorithm:
         ----------
         target_yaw : float
             Desired absolute orientation (yaw) in radians.
-
-        angular_speed : float, optional
-            Initial angular velocity.
 
         Returns
         -------
@@ -868,7 +858,7 @@ class Algorithm:
             f"(delta: {target_delta_yaw:.2f})"
         )
 
-        return self._rotate_by_angle(target_delta_yaw, angular_speed)
+        return self._rotate_by_angle(target_delta_yaw)
 
     def _drive_to_the_point(
         self, dest_x: float, dest_y: float,
@@ -948,7 +938,10 @@ class Algorithm:
         return False
 
     def _go_to_point_using_odometry(
-        self, dest_x: float, dest_y: float
+        self, 
+        dest_x: float, 
+        dest_y: float,
+        go_fast: bool = False
     ) -> bool:
         """
         Navigate the robot to a target 2D point using a two-phase
@@ -969,6 +962,10 @@ class Algorithm:
 
         dest_y : float
             Target y-coordinate in the world frame.
+
+        go_fast : bool, optional
+            If True, the robot will use a higher linear and angular speed when driving
+            toward the target point. Faster, but less accurate. Default is False.
 
         Returns
         -------
@@ -996,13 +993,10 @@ class Algorithm:
 
         delta_yaw = normalize_angle(target_angle - current_yaw)
 
-        # ROtate towards point
-        angular_speed = (
-            DEFAULT_ROTATION_SPEED
-            if delta_yaw > 0
-            else -DEFAULT_ROTATION_SPEED
-        )
-        if not self._rotate_by_angle(delta_yaw, angular_speed=angular_speed):
+        if not self._rotate_by_angle(
+            delta_yaw, 
+            go_fast=go_fast
+        ):
             print("Rotating towards point failed.")
             return False
         else:

@@ -252,3 +252,26 @@ def global_coords_to_local_coords(
     pc_x, pc_y = rotate_vector(x_rotated, y_rotated, -robot_yaw)
 
     return pc_x, pc_y
+
+def clamp_speed(speed: float, max_speed: float, min_speed: float = 0.0) -> float:
+    """
+    Clamp the speed to the range [-max_speed, max_speed].
+
+    Args:
+        speed (float): The input speed value.
+        max_speed (float): The maximum allowed speed.
+        min_speed (float): The minimum allowed speed.
+
+    Returns:
+        float: The clamped speed value.
+    """
+    if speed > max_speed:
+        return max_speed
+    elif speed < -max_speed:
+        return -max_speed
+    elif 0 < speed < min_speed:
+        return min_speed
+    elif -min_speed < speed < 0:
+        return -min_speed
+    else:
+        return speed
