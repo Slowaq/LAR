@@ -741,6 +741,7 @@ class Algorithm:
 
             odometry = self.robot.get_odometry()
             pc = self.robot.get_point_cloud()
+            rgb_image = self.robot.get_rgb_image()
 
             # mask out floor points and points too high
             mask = pc[:, :, 1] < 0.1
@@ -762,13 +763,14 @@ class Algorithm:
             image = np.clip(depth_scaled, 0, 255).astype(np.uint8)
             im_color = cv2.applyColorMap(255 - image, cv2.COLORMAP_JET)
 
+            rgb_image = rgb_image[mask]
             im_bw = np.uint8(mask) * 255
 
             # convert to black and white to rgb image
             im_bw_rgb = cv2.cvtColor(im_bw, cv2.COLOR_GRAY2BGR)
 
             # stack images horizontally
-            im_stacked = np.hstack((im_color, im_bw_rgb))
+            im_stacked = np.hstack((im_color, im_bw_rgb, rgb_image))
 
             cv2.imshow('obstacles', im_stacked)
             key = cv2.waitKey(1)
