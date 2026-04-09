@@ -9,11 +9,13 @@ from .math_utils import (
     extend_vector,
     local_coords_to_global_coords,
     global_coords_to_local_coords,
-    clamp_speed
+    clamp_speed,
+    line_intesects_circle
 )
 import numpy as np
 import math
 from typing import Tuple, List, Optional
+import networkx as nx
 
 GARAGE_EXIT_ROTATION_SPEED = 0.3
 GOAL_DISTANCE_TOLERANCE = 0.085
@@ -28,8 +30,8 @@ GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
-PYLON_SEARCH_PATH = [(0.7, 0), (0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.7, -0.7)]
-
+POINT_IN_FRONT_OF_GARAGE = (0.7, 0)
+CORNER_POINTS_AROUND_GARAGE = [(0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.7, -0.7)]
 
 class Algorithm:
     def __init__(self) -> None:
@@ -40,7 +42,8 @@ class Algorithm:
         self.record_trajectory: bool = False
         # List to store the trajectory of the robot
         self.trajectory: List[Tuple[float, float]] = []
-        self.points_visited: List[Tuple[float, float]] = []
+        self.safe_points: List[Tuple[float, float]] = CORNER_POINTS_AROUND_GARAGE[:]
+        self.pylon_position: Optional[Tuple[float, float]] = None
 
     def run(self) -> None:
         """
@@ -55,11 +58,11 @@ class Algorithm:
         """
         self.stop = False
         self.points_visited = []
-        self.get_point_in_front_of_robot()  # For debugging - visualize point cloud and RGB data
         # self.exit_garage()
-        # self.approach_pylon()
-        # self.drive_around_pylon()
-        # self.return_to_garage()
+        self.robot.reset_odometry()
+        self.approach_pylon()
+        self.drive_around_pylon()
+        self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
@@ -209,7 +212,9 @@ class Algorithm:
         Returns:
             None
         """
-        for point in PYLON_SEARCH_PATH:
+        stack_of_points = CORNER_POINTS_AROUND_GARAGE + [POINT_IN_FRONT_OF_GARAGE]
+        while stack_of_points:
+            point = stack_of_points.pop()
             if not self._go_to_point_using_odometry(*point):
                 print(
                     "Driving to point ({:.2f}, {:.2f}) failed".format(
@@ -226,6 +231,12 @@ class Algorithm:
                     "Couldnt find pylon from this position "
                     "- trying different point"
                 )
+                if point in CORNER_POINTS_AROUND_GARAGE:
+                    if self._is_space_in_front_of_robot_clear():
+                        odometry = self.robot.get_odometry()
+                        new_point = local_coords_to_global_coords(0, 1.0, odometry)
+                        stack_of_points.append(new_point)
+                        self.safe_points.append(new_point)
 
             
         print("Couldnt find pylon at all")
@@ -251,7 +262,6 @@ class Algorithm:
         initial_yaw = odom[2]
         initial_point = (odom[0], odom[1])
         left_origin = False
-        robot_had_to_dodge_garage = False
 
         while not self._is_stopping():
             # --- RGB OBRAZ ---
@@ -290,7 +300,7 @@ class Algorithm:
             angular = 0.0
             distance = None
 
-            pylon, frame, bw_mask = find_pylon(frame)
+            pylon, frame, _ = find_pylon(frame)
 
             if pylon is None:
                 angular = 0.4  # hľadanie objektu
@@ -325,8 +335,6 @@ class Algorithm:
                         ) < 1.5
                         and abs(origin_local_x) < 0.8
                     ):
-
-                        robot_had_to_dodge_garage = True
 
                         # Scale avoidance: max 0.4 when origin centered
                         avoidance_strength = (
@@ -391,16 +399,9 @@ class Algorithm:
                             target_point = local_coords_to_global_coords(
                                 *target_point_local, odometry
                             )
-
-                            if robot_had_to_dodge_garage:
-                                # Make sure the robot avoids the garage on its
-                                # way back also.
-                                midpoint = average_vector(
-                                    target_point, initial_point
-                                )
-                                midpoint = extend_vector(midpoint, 1)
-                                print(f"Added {midpoint} to path")
-                                self.points_visited.append(midpoint)
+                            self.pylon_position = local_coords_to_global_coords(
+                                pylon_local, odometry
+                            )
 
                             if not self._go_to_point_using_odometry(
                                 *target_point
@@ -446,15 +447,16 @@ class Algorithm:
         # Convert to global frame
         points_global = []
         for x, y in PYLON_AROUND_PATH:
-            x_transformed, y_transformed = local_coords_to_global_coords(
+            point_global = local_coords_to_global_coords(
                 x, y, start_odom
             )
-            points_global.append((x_transformed, y_transformed))
+            points_global.append(point_global)
+            self.safe_points.append(point_global)
 
         # Execute path
-        for x_transformed, y_transformed in points_global:
+        for point_global in points_global:
             if not self._go_to_point_using_odometry(
-                x_transformed, y_transformed
+                *point_global
             ):
                 break
 
@@ -645,7 +647,8 @@ class Algorithm:
             bool: True if it successfully reaches the approach point and
                 rotates, False otherwise.
         """
-        for point in self.points_visited[::-1]:
+        path = self._get_path_to_garage()
+        for point in path:
             # Get in front of garage approximately using odometry
             if not self._go_to_point_using_odometry(*point, go_fast=True):
                 return False
@@ -733,77 +736,70 @@ class Algorithm:
         self.robot.cmd_velocity(0, 0)
         return False
 
-    def get_point_in_front_of_robot(self) -> Optional[Tuple[float, float]]:
-        self._wait_for_new_data()
+    def _is_space_in_front_of_robot_clear(self) -> bool:
 
-        while True:
-            self.robot.cmd_velocity(0, 0)
+        self.robot.cmd_velocity(0, 0)
+        self._wait_for_point_cloud()
 
-            odometry = self.robot.get_odometry()
-            pc = self.robot.get_point_cloud()
-            rgb_image = self.robot.get_rgb_image()
+        pc = self.robot.get_point_cloud()
 
-            # mask out floor points and points too high
-            mask = pc[:, :, 1] < -0.1
-            mask = np.logical_and(mask, pc[:, :, 1] > -0.3)
+        # mask out floor points and points too high
+        mask = pc[:, :, 1] < -0.1
+        mask = np.logical_and(mask, pc[:, :, 1] > -0.3)
 
-            # mask point that are not in front of the robot
-            mask = np.logical_and(mask, pc[:, :, 0] < 0.3)
-            mask = np.logical_and(mask, pc[:, :, 0] > -0.3)
+        # mask point that are not in front of the robot
+        mask = np.logical_and(mask, pc[:, :, 0] < 0.3)
+        mask = np.logical_and(mask, pc[:, :, 0] > -0.3)
 
+        data = np.sort(pc[:, :, 2][mask])
 
-            image = np.zeros(mask.shape)
+        if data.size > 50:
+            dist = np.percentile(data, 10)
+            if dist > 1.5:
+                return True    
+        else:
+            return None
 
-            # check obstacle
-            data = np.sort(pc[:, :, 2][mask])
-            if data.size > 50:
-                dist = np.percentile(data, 10)
-    
+    def _get_path_to_garage(self) -> List[Tuple[float, float]]:
+        self._wait_for_odometry()
+        odom = self.robot.get_odometry()
+        if odom is None:
+            return []   # robot got interrupted
+        current_point = (odom[0], odom[1])
+        self.safe_points.sort(
+            key=lambda x: get_distance(x, current_point)
+        )
+        start_point = self.safe_points[0] # closest point
+        target_point = POINT_IN_FRONT_OF_GARAGE
 
-            import cv2
-            # assign depth i.e. distance to image for all points
-            depth_scaled = pc[:, :, 2] / 3.0 * 255
-            depth_scaled = np.nan_to_num(depth_scaled, nan=0, posinf=255, neginf=0)
-            image = np.clip(depth_scaled, 0, 255).astype(np.uint8)
-            # write the distance to the upper left corner of the image
-            cv2.putText(
-                image, f"dist: {dist:.2f} m", (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
-            )
-            im_color = cv2.applyColorMap(255 - image, cv2.COLORMAP_JET)
+        graph = nx.Graph()
+        for i, point_1 in enumerate(self.safe_points + [target_point]):
+            rest_of_safe_points = self.safe_points[:i]
+            for point_2 in rest_of_safe_points:
+                if line_intesects_circle(
+                    point_1,
+                    point_2,
+                    (0,0),   # origin
+                    0.69     # safe radius around garage   
+                ):
+                    continue
+                if line_intesects_circle(
+                    point_1,
+                    point_2,
+                    self.pylon_position,
+                    0.3     # safe radius around pylon
+                ):
+                    continue
 
-            im_bw = np.uint8(mask) * 255
+                distance = get_distance(point_1, point_2)
+                graph.add_edge(point_1, point_2, weight=distance)
 
-            # convert to black and white to rgb image
-            im_bw_rgb = cv2.cvtColor(im_bw, cv2.COLOR_GRAY2BGR)
-
-            # preserve original color where mask is true, black elsewhere
-            rgb_masked = rgb_image.copy()
-            rgb_masked[~mask] = 0
-
-            # stack images horizontally
-            im_stacked = np.hstack((im_color, im_bw_rgb, rgb_masked))
-
-            cv2.imshow('obstacles', im_stacked)
-            key = cv2.waitKey(1)
-            if key == ord('q'):
-                cv2.destroyAllWindows()
-                return None
-
-
-
-        # if data.size > 50:
-        #     dist = np.percentile(data, 10)
-        #     if dist > 1.5:
-        #         local_point = (0.0, 1.0)  # 1 meter forward
-        #         return local_coords_to_global_coords(
-        #             *local_point,
-        #             odometry
-        #         )
-        # else:
-        #     return None
-
-
+        # Get the shortest path
+        path = nx.dijkstra_path(graph, source=start_point, target=target_point)
+        print(f"Calculated path to garage:")
+        from pprint import pprint
+        pprint(path)
+        return path[1:]  # skip the first point since we are already there
 
     def _drive_forward(self, distance: float) -> bool:
         """
