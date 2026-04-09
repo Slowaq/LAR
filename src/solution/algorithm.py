@@ -758,7 +758,7 @@ class Algorithm:
 
             import cv2
             # assign depth i.e. distance to image
-            image[mask] = np.int8(pc[:, :, 2] / 3.0 * 255)
+            image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
             im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
                                         cv2.COLORMAP_JET)
 
