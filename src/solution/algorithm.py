@@ -763,14 +763,17 @@ class Algorithm:
             image = np.clip(depth_scaled, 0, 255).astype(np.uint8)
             im_color = cv2.applyColorMap(255 - image, cv2.COLORMAP_JET)
 
-            rgb_image = rgb_image[mask]
             im_bw = np.uint8(mask) * 255
 
             # convert to black and white to rgb image
             im_bw_rgb = cv2.cvtColor(im_bw, cv2.COLOR_GRAY2BGR)
 
+            # preserve original color where mask is true, black elsewhere
+            rgb_masked = rgb_image.copy()
+            rgb_masked[~mask] = 0
+
             # stack images horizontally
-            im_stacked = np.hstack((im_color, im_bw_rgb, rgb_image))
+            im_stacked = np.hstack((im_color, im_bw_rgb, rgb_masked))
 
             cv2.imshow('obstacles', im_stacked)
             key = cv2.waitKey(1)
