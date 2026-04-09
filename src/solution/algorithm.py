@@ -745,7 +745,7 @@ class Algorithm:
         """
         Check if the space in front of the robot is clear using
         point cloud data.
-   
+
         Returns:
             bool: True if there is free space
         """
