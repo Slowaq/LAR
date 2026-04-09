@@ -41,7 +41,9 @@ def find_pylon(
     # Apply the vertical offset: set top 80 rows to 0 (black)
     mask[0:80, :] = 0
 
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     target_coords = None
 
@@ -93,7 +95,8 @@ def find_pylon(
             ((x, y), radius) = cv2.minEnclosingCircle(cnt)
             x, y = int(x), int(y)
 
-            # Save the coordinates of the largest contour (the first one processed)
+            # Save the coordinates of the largest contour (the first one
+            # processed)
             if (
                 target_coords is None
                 and passed_area_check
@@ -122,7 +125,8 @@ def find_pylon(
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1
             )
 
-    # Return the target coordinates (if any were found), the drawn frame, and the mask
+    # Return the target coordinates (if any were found), the drawn frame,
+    # and the mask
     return target_coords, frame_bgr, mask
 
 

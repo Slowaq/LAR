@@ -16,10 +16,12 @@ def get_average_of_nearby_pixels(
         pc (np.ndarray): HxWx3 point cloud array.
         y (int): Pixel row coordinate.
         x (int): Pixel column coordinate.
-        window_size (int, optional): Odd number defining the window size. Defaults to 5.
+        window_size (int, optional): Odd number defining the window size.
+            Defaults to 5.
 
     Returns:
-        Optional[np.ndarray]: An array representing the [x, y, z] average, or None if no valid points are found.
+        Optional[np.ndarray]: An array representing the [x, y, z] average, or
+            None if no valid points are found.
     """
     half_w = window_size // 2
     h, w, _ = pc.shape
@@ -202,7 +204,8 @@ def local_coords_to_global_coords(
     Args:
         pc_x (float): The local x-coordinate.
         pc_y (float): The local y-coordinate.
-        odometry (np.ndarray): Array containing [robot_global_x, robot_global_y, robot_yaw].
+        odometry (np.ndarray): Array containing
+            [robot_global_x, robot_global_y, robot_yaw].
 
     Returns:
         Tuple[float, float]: The transformed (global_x, global_y) coordinates.
@@ -228,12 +231,15 @@ def global_coords_to_local_coords(
     Args:
         global_x (float): The global x-coordinate.
         global_y (float): The global y-coordinate.
-        odometry (np.ndarray): Array containing [robot_global_x, robot_global_y, robot_yaw].
+        odometry (np.ndarray): Array containing
+            [robot_global_x, robot_global_y, robot_yaw].
 
     Returns:
         Tuple[float, float]: The transformed (local_x, local_y) coordinates.
     """
-    robot_global_x, robot_global_y, robot_yaw = odometry[0], odometry[1], odometry[2]
+    robot_global_x, robot_global_y, robot_yaw = (
+        odometry[0], odometry[1], odometry[2]
+    )
 
     # 1. Translate back to robot-centric origin
     dx = global_x - robot_global_x
@@ -247,3 +253,70 @@ def global_coords_to_local_coords(
     pc_x, pc_y = rotate_vector(x_rotated, y_rotated, -robot_yaw)
 
     return pc_x, pc_y
+
+def clamp_speed(speed: float, max_speed: float, min_speed: float = 0.0) -> float:
+    """
+    Clamp the speed to the range [-max_speed, max_speed].
+
+    Args:
+        speed (float): The input speed value.
+        max_speed (float): The maximum allowed speed.
+        min_speed (float): The minimum allowed speed.
+
+    Returns:
+        float: The clamped speed value.
+    """
+    if speed > max_speed:
+        return max_speed
+    elif speed < -max_speed:
+        return -max_speed
+    elif 0 < speed < min_speed:
+        return min_speed
+    elif -min_speed < speed < 0:
+        return -min_speed
+    else:
+        return speed
+
+def line_intesects_circle(
+        point_1: Tuple[float, float], 
+        point_2: Tuple[float, float], 
+        circle_center: Tuple[float, float],
+        radius: float
+    ) -> bool:
+    x1, y1 = point_1
+    x2, y2 = point_2
+    xc, yc = circle_center
+
+    # Vector AB (from point_1 to point_2)
+    dx = x2 - x1
+    dy = y2 - y1
+
+    # Squared length of the line segment AB
+    len_sq = dx**2 + dy**2
+
+    # Edge case: point_1 and point_2 are the exact same point
+    if len_sq == 0:
+        dist = math.hypot(xc - x1, yc - y1)
+        return dist <= radius
+
+    # Vector AC (from point_1 to circle_center)
+    ac_x = xc - x1
+    ac_y = yc - y1
+
+    # Calculate the projection scalar t
+    # t = (AC dot AB) / (AB dot AB)
+    t = (ac_x * dx + ac_y * dy) / len_sq
+
+    # Check if the center projects outside the line segment
+    if t < 0.0 or t > 1.0:
+        return False
+
+    # Find the projected point P on the line segment
+    px = x1 + t * dx
+    py = y1 + t * dy
+
+    # Calculate the distance from the circle center to the projected point P
+    dist = math.hypot(xc - px, yc - py)
+
+    # Intersection occurs if the distance is less than or equal to the radius
+    return dist <= radius
