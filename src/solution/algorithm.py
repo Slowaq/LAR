@@ -58,13 +58,11 @@ class Algorithm:
         """
         self.stop = False
         self.points_visited = []
-        while not self._is_stopping():
-            self._is_space_in_front_of_robot_clear()
         # self.exit_garage()
-        # self.robot.reset_odometry()
-        # self.approach_pylon()
-        # self.drive_around_pylon()
-        # self.return_to_garage()
+        self.robot.reset_odometry()
+        self.approach_pylon()
+        self.drive_around_pylon()
+        self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
@@ -233,7 +231,7 @@ class Algorithm:
                     "Couldnt find pylon from this position "
                     "- trying different point"
                 )
-                if point in CORNER_POINTS_AROUND_GARAGE or True:
+                if point in CORNER_POINTS_AROUND_GARAGE or point == POINT_IN_FRONT_OF_GARAGE:
                     print("Cheking if robot can go forward")
                     if self._is_space_in_front_of_robot_clear():
                         print("Going forward since space is clear")
@@ -733,7 +731,6 @@ class Algorithm:
 
         pc = self.robot.get_point_cloud()
         if pc is None:
-            print("Missing PC")
             return False  # robot got interrupted
 
         # mask out floor points and points too high
@@ -748,11 +745,10 @@ class Algorithm:
 
         if data.size > 50:
             dist = np.percentile(data, 10)
-            print(f"{dist:.3f}, {dist > 1.5}")
-            if dist > 1.5:
+            print(f"Free distance: {dist:.3f} m")
+            if dist > 1.3:
                 return True    
         else:
-            print("issufificeant data size")
             return None
 
     def _get_path_to_garage(self) -> List[Tuple[float, float]]:
