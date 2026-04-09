@@ -111,7 +111,7 @@ def find_pylon(
                 cv2.circle(frame_bgr, (x, y), 3, (0, 0, 255), -1)
                 target_coords = (x, y)
 
-            # kreslenie - draw bounding circle and center for EVERY contour
+            # drawing - draw bounding circle and center for EVERY contour
             cv2.circle(frame_bgr, (x, y), int(radius), (0, 255, 0), 2)
 
             label = (
@@ -189,7 +189,7 @@ def find_purple_quads(
         # 2. Aspect Ratio Check
         _, _, w, h = cv2.boundingRect(cnt)
         aspect_ratio = float(w) / h
-        # Wh expect tall rectangles
+        # We expect tall rectangles
         if aspect_ratio > 0.5:
             continue
 

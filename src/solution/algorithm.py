@@ -116,7 +116,7 @@ class Algorithm:
         print('Waiting for point cloud and odometry...')
         self._wait_for_point_cloud()
         self._wait_for_odometry()
-        print('First point cloud and odometry recieved ...')
+        print('First point cloud and odometry received ...')
 
         EXIT_FREE_SPACE_THRESHOLD = 0.50
         MIN_GARAGE_GATE_ANGLE = 0.75  # [rad]
@@ -152,9 +152,8 @@ class Algorithm:
             if current_odom is None:
                 continue
             current_yaw = current_odom[2]
-            print(f"dist={dist:.2f}, yaw={current_yaw:.3f}")
 
-            # [1] - find exit approximetly
+            # [1] - find exit approximately
             if not found_exit_roughly:
                 self.robot.cmd_velocity(0, GARAGE_EXIT_ROTATION_SPEED)
                 if dist >= EXIT_FREE_SPACE_THRESHOLD:
@@ -282,7 +281,7 @@ class Algorithm:
         left_origin = False
 
         while not self._is_stopping():
-            # --- RGB OBRAZ ---
+            # --- RGB IMAGE ---
             frame = self.robot.get_rgb_image()
             if frame is None:
                 print("No RGB image")
@@ -305,7 +304,7 @@ class Algorithm:
                 left_origin
                 and abs(normalize_angle(initial_yaw - current_yaw)) < 0.2
             ):
-                print("Robot did full circle and couldnt find pylon")
+                print("Robot did full circle and couldn't find pylon")
                 return False
 
             image = np.zeros(pc.shape[:2])
@@ -321,7 +320,7 @@ class Algorithm:
             pylon, frame, _ = find_pylon(frame)
 
             if pylon is None:
-                angular = 0.4  # hľadanie objektu
+                angular = 0.4  # searching for object
             else:
                 column, row = pylon[0], pylon[1]
                 pylon_pc = get_average_of_nearby_pixels(pc, row, column)
@@ -396,7 +395,7 @@ class Algorithm:
                                 continue  # Only happens if interrupted
                             distance = pylon_pc[2]
                             # We can drive a bit more forward, but
-                            # the camera wont see the pylon anymore
+                            # the camera won't see the pylon anymore
                             pylon_local = (pylon_pc[0], distance)
                             target_point_local = extend_vector(
                                 pylon_local, -0.3
@@ -423,7 +422,7 @@ class Algorithm:
                     else:
                         angular = 0.4
 
-            # Nemame validni vzdalenost - tocime se na miste a hledame pylon
+            # We don't have valid distance - rotating in place and searching for pylon
             else:
                 pass
 
@@ -474,7 +473,7 @@ class Algorithm:
         Returns:
             None
         """
-        print("returning to garage")
+        print("Returning to garage")
         if not self.approach_garage():
             print("Failed to approach garage")
             return
@@ -608,11 +607,8 @@ class Algorithm:
 
             # Get the garage midpoint (everything is already in global
             # coordinate space)
-            print(f"left globally: {pillar_1}")
-            print(f"right globally: {pillar_2}")
 
             garage_gate = average_vector(pillar_1, pillar_2)
-            print(f"garage_gate: {garage_gate}")
 
             # Calculate the vector from pillar 1 to pillar 2
             dx = pillar_2[0] - pillar_1[0]
@@ -630,7 +626,6 @@ class Algorithm:
             # Make sure the robot is not facing the opposite direction
             if abs(normalize_angle(target_angle - current_yaw)) > math.pi / 2:
                 target_angle = normalize_angle(target_angle + math.pi)
-            print(f"target angle: {target_angle:.3f}")
 
             if not self._go_to_point_using_odometry(*garage_gate):
                 return False
@@ -720,16 +715,12 @@ class Algorithm:
             # Heading error
             angle_error = normalize_angle(desired_yaw - yaw)
 
-            # print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
-            #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")
-
             # Proportional angular correction
             angular = 0.5 * angle_error
             angular = max(
                 min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED
             )  # Clamp
 
-            print(f"Distance: {dist:.2f}, thres: {GARAGE_WALL_DISTANCE:.2f}")
             if dist > GARAGE_WALL_DISTANCE:
                 self.robot.cmd_velocity(GARAGE_PARKING_LINEAR_SPEED, angular)
             else:
@@ -808,9 +799,6 @@ class Algorithm:
 
         # Get the shortest path
         path = nx.dijkstra_path(graph, source=start_point, target=target_point)
-        print("Calculated path to garage:")
-        from pprint import pprint
-        pprint(path)
         return path[1:]  # skip the first point since we are already there
 
     def _drive_forward(self, distance: float) -> bool:
@@ -968,9 +956,6 @@ class Algorithm:
 
             # heading error
             angle_error = normalize_angle(desired_yaw - yaw)
-
-            # print(f"Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), "
-            #     f"distance={distance:.2f}, angle_error={angle_error:.2f}")
 
             # stop condition
             if distance < GOAL_DISTANCE_TOLERANCE:

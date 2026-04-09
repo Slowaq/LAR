@@ -1,3 +1,5 @@
+"""Callback functions for handling bumper and button events."""
+
 from .algorithm import Algorithm
 from kobuki_msgs.msg import ButtonEvent, BumperEvent
 import threading
