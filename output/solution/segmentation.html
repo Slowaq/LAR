@@ -39,6 +39,9 @@ hljs.highlightAll();
 </code></dt>
 <dd>
 <div class="desc"><p>Detect purple rectangular quads in a BGR frame.</p>
+<p>Uses HSV color space filtering and shape validation to find purple
+vertical rectangles. Filters by solidity and aspect ratio to reject
+non-rectangular shapes.</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>frame_bgr</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -46,13 +49,12 @@ hljs.highlightAll();
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt>tuple:</dt>
-<dt><code>
-List[Tuple[int, int]]</code></dt>
-<dd>ordered list of quad center coordinates
-as (column, row).
-np.ndarray: annotated BGR image showing detections.
-np.ndarray: binary mask of detected purple regions.</dd>
+<dt><code>Tuple[List[Tuple[int, int]], np.ndarray, np.ndarray]</code></dt>
+<dd>A tuple
+containing (centers, annotated_image, mask). centers is a list
+of (column, row) pixel coordinates for each detected quad.
+annotated_image shows detections overlaid. mask is the binary
+purple detection mask.</dd>
 </dl></div>
 </dd>
 <dt id="solution.segmentation.find_pylon"><code class="name flex">
@@ -60,6 +62,9 @@ np.ndarray: binary mask of detected purple regions.</dd>
 </code></dt>
 <dd>
 <div class="desc"><p>Detect the green pylon in an RGB frame.</p>
+<p>Uses HSV color space filtering, morphological operations, and contour
+analysis to find a green circular object. Returns pixel coordinates of
+the detected center.</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>frame</code></strong> :&ensp;<code>np.ndarray</code></dt>
@@ -67,13 +72,12 @@ np.ndarray: binary mask of detected purple regions.</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <dl>
-<dt>tuple:</dt>
-<dt><code>
-Optional[Tuple[int, int]]</code></dt>
-<dd>pixel coordinates (column, row) of the
-detected pylon center, or None if no pylon was found.
-np.ndarray: visualization image with overlays drawn.
-np.ndarray: binary mask used for the green detection.</dd>
+<dt><code>Tuple[Optional[Tuple[int, int]], np.ndarray, np.ndarray]</code></dt>
+<dd>A tuple
+containing (center_coords, annotated_image, mask). center_coords
+is None if no pylon was found, otherwise (column, row) pixel
+coordinates. annotated_image is the visualization. mask is the
+binary detection mask.</dd>
 </dl></div>
 </dd>
 </dl>

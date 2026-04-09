@@ -161,7 +161,27 @@ None if no valid points are found.</dd>
 <span>def <span class="ident">line_intersects_circle</span></span>(<span>point_1: Tuple[float, float], point_2: Tuple[float, float], circle_center: Tuple[float, float], radius: float) ‑> bool</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Detect if a line segment intersects a circle.</p></div>
+<div class="desc"><p>Detect if a line segment intersects a circle.</p>
+<p>Use projection to find the closest point on the line segment to the
+circle center. If the distance is within the radius, an intersection
+exists.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>point_1</code></strong> :&ensp;<code>Tuple[float, float]</code></dt>
+<dd>First endpoint of the line segment.</dd>
+<dt><strong><code>point_2</code></strong> :&ensp;<code>Tuple[float, float]</code></dt>
+<dd>Second endpoint of the line segment.</dd>
+<dt><strong><code>circle_center</code></strong> :&ensp;<code>Tuple[float, float]</code></dt>
+<dd>Center of the circle.</dd>
+<dt><strong><code>radius</code></strong> :&ensp;<code>float</code></dt>
+<dd>Radius of the circle.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><code>bool</code></dt>
+<dd>True if the line segment intersects the circle, False
+otherwise.</dd>
+</dl></div>
 </dd>
 <dt id="solution.math_utils.local_coords_to_global_coords"><code class="name flex">
 <span>def <span class="ident">local_coords_to_global_coords</span></span>(<span>pc_x: float, pc_y: float, odometry: np.ndarray) ‑> Tuple[float, float]</span>
