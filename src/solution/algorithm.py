@@ -18,7 +18,7 @@ GARAGE_EXIT_ROTATION_SPEED = 0.3
 GOAL_DISTANCE_TOLERANCE = 0.085
 DEFAULT_DRIVE_SPEED = 0.2
 DEFAULT_ROTATION_SPEED = 0.9
-MAX_ROTATION_SPEED = 0.7
+MAX_ROTATION_SPEED = 1.5    # original: 0.7
 MIN_ROTATION_SPEED = 0.2
 # Proportional gain for heading correction, proportional to angle error (rad)
 HEADING_KP = 5.0
@@ -27,15 +27,7 @@ GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
-PYLON_SEARCH_PATH = [(0.6, 0)] + [
-    (
-        PYLON_SEARCH_RADIUS
-        * math.cos(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT),
-        PYLON_SEARCH_RADIUS
-        * math.sin(i * 2 * math.pi / PYLON_SEARCH_POINT_COUNT),
-    )
-    for i in range(PYLON_SEARCH_POINT_COUNT)
-]
+PYLON_SEARCH_PATH = [(0.6, 0), (0.6, 0.6), (-0.6, 0.6), (-0.6, -0.6), (0.6, -0.6)]
 
 
 class Algorithm:
@@ -62,15 +54,17 @@ class Algorithm:
         """
         self.stop = False
         self.points_visited = []
-        self.exit_garage()
+        # self.exit_garage()
+        self.robot.reset_odometry()
         self.approach_pylon()
-        self.drive_around_pylon()
+        # self.drive_around_pylon()
         self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
+            self.robot.play_sound(1)
         else:
-            self.robot.play_sound()
+            self.robot.play_sound(0)
             print("Algorithm successfully finished")
         self.stop = True
 
@@ -224,13 +218,13 @@ class Algorithm:
                 return
             self.points_visited.append(point)
 
-            if self.look_for_pylon():
-                return
-            else:
-                print(
-                    "Couldnt find pylon from this position "
-                    "- trying different point"
-                )
+            # if self.look_for_pylon():
+            #     return
+            # else:
+            #     print(
+            #         "Couldnt find pylon from this position "
+            #         "- trying different point"
+            #     )
         print("Couldnt find pylon at all")
 
     def look_for_pylon(self) -> bool:
