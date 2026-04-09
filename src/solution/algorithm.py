@@ -67,7 +67,7 @@ class Algorithm:
             None
         """
         self.stop = False
-        self.points_visited = []
+        self.points_visited: List[Tuple[float, float]] = []
         self.exit_garage()
         self.approach_pylon()
         self.drive_around_pylon()
@@ -767,7 +767,7 @@ class Algorithm:
             if dist > 1.3:
                 return True
         else:
-            return None
+            return False
 
     def _get_path_to_garage(self) -> List[Tuple[float, float]]:
         """Compute a path from current position to the garage using
@@ -796,7 +796,7 @@ class Algorithm:
                 if line_intersects_circle(
                     point_1,
                     point_2,
-                    self.pylon_position,
+                    self.pylon_position,  # type: ignore[arg-type]
                     0.3     # safe radius around pylon
                 ):
                     continue
@@ -874,8 +874,6 @@ class Algorithm:
             odom = self.robot.get_odometry()
             if odom is None:
                 return False
-            if self.record_trajectory:
-                self.trajectory.append((odom[0], odom[1]))
 
             dyaw = normalize_angle(odom[2] - start_yaw)
 
@@ -981,8 +979,6 @@ class Algorithm:
                 continue
 
             x, y, yaw = current
-            if self.record_trajectory:
-                self.trajectory.append((x, y))
 
             # distance to goal
             distance = get_distance(current, (dest_x, dest_y))
