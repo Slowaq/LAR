@@ -48,6 +48,8 @@ def register_callbacks(algorithm: Algorithm) -> None:
         """
         try:
             algorithm.run()
+        except Exception as e:
+            print(f"ALGORITHM CRASHED: {e}")
         finally:
             algorithm.is_running = False
             algorithm.stop = True
