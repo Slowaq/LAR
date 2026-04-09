@@ -744,11 +744,11 @@ class Algorithm:
 
             # mask out floor points and points too high
             mask = pc[:, :, 1] < 0.2
-            mask = np.logical_and(mask, pc[:, :, 1] > -0.2)
+            mask = np.logical_and(mask, pc[:, :, 1] > -0.1)
 
             # mask point that are not in front of the robot
-            mask = np.logical_and(mask, pc[:, :, 0] < 0.5)
-            mask = np.logical_and(mask, pc[:, :, 0] > -0.5)
+            mask = np.logical_and(mask, pc[:, :, 0] < 0.3)
+            mask = np.logical_and(mask, pc[:, :, 0] > -0.3)
 
             # check obstacle
             data = np.sort(pc[:, :, 2][mask])
