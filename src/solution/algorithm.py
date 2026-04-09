@@ -751,16 +751,25 @@ class Algorithm:
             mask = np.logical_and(mask, pc[:, :, 0] < 0.3)
             mask = np.logical_and(mask, pc[:, :, 0] > -0.3)
 
-            # check obstacle
-            data = np.sort(pc[:, :, 2][mask])
 
             image = np.zeros(mask.shape)
+
+            # check obstacle
+            data = np.sort(pc[:, :, 2][mask])
+            if data.size > 50:
+                dist = np.percentile(data, 10)
+    
 
             import cv2
             # assign depth i.e. distance to image for all points
             depth_scaled = pc[:, :, 2] / 3.0 * 255
             depth_scaled = np.nan_to_num(depth_scaled, nan=0, posinf=255, neginf=0)
             image = np.clip(depth_scaled, 0, 255).astype(np.uint8)
+            # write the distance to the upper left corner of the image
+            cv2.putText(
+                image, f"dist: {dist:.2f} m", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2
+            )
             im_color = cv2.applyColorMap(255 - image, cv2.COLORMAP_JET)
 
             im_bw = np.uint8(mask) * 255
@@ -780,8 +789,6 @@ class Algorithm:
             if key == ord('q'):
                 cv2.destroyAllWindows()
                 return None
-
-    
 
 
 
