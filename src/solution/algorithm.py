@@ -762,7 +762,7 @@ class Algorithm:
             im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
                                         cv2.COLORMAP_JET)
 
-            im_bw = np.int8(pc[:, :, 2] > 1.5)
+            im_bw = np.uint8(pc[:, :, 2] > 1.5)
 
             # convert to black and white to rgb image
             im_bw_rgb = cv2.cvtColor(im_bw, cv2.COLOR_GRAY2BGR)
