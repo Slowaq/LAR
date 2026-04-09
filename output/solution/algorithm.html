@@ -131,7 +131,7 @@ garages, and responding to bumper/button inputs.</p></div>
         print(&#39;Waiting for point cloud and odometry...&#39;)
         self._wait_for_point_cloud()
         self._wait_for_odometry()
-        print(&#39;First point cloud and odometry recieved ...&#39;)
+        print(&#39;First point cloud and odometry received ...&#39;)
 
         EXIT_FREE_SPACE_THRESHOLD = 0.50
         MIN_GARAGE_GATE_ANGLE = 0.75  # [rad]
@@ -167,9 +167,8 @@ garages, and responding to bumper/button inputs.</p></div>
             if current_odom is None:
                 continue
             current_yaw = current_odom[2]
-            print(f&#34;dist={dist:.2f}, yaw={current_yaw:.3f}&#34;)
 
-            # [1] - find exit approximetly
+            # [1] - find exit approximately
             if not found_exit_roughly:
                 self.robot.cmd_velocity(0, GARAGE_EXIT_ROTATION_SPEED)
                 if dist &gt;= EXIT_FREE_SPACE_THRESHOLD:
@@ -297,7 +296,7 @@ garages, and responding to bumper/button inputs.</p></div>
         left_origin = False
 
         while not self._is_stopping():
-            # --- RGB OBRAZ ---
+            # --- RGB IMAGE ---
             frame = self.robot.get_rgb_image()
             if frame is None:
                 print(&#34;No RGB image&#34;)
@@ -320,7 +319,7 @@ garages, and responding to bumper/button inputs.</p></div>
                 left_origin
                 and abs(normalize_angle(initial_yaw - current_yaw)) &lt; 0.2
             ):
-                print(&#34;Robot did full circle and couldnt find pylon&#34;)
+                print(&#34;Robot did full circle and couldn&#39;t find pylon&#34;)
                 return False
 
             image = np.zeros(pc.shape[:2])
@@ -336,7 +335,7 @@ garages, and responding to bumper/button inputs.</p></div>
             pylon, frame, _ = find_pylon(frame)
 
             if pylon is None:
-                angular = 0.4  # hľadanie objektu
+                angular = 0.4  # searching for object
             else:
                 column, row = pylon[0], pylon[1]
                 pylon_pc = get_average_of_nearby_pixels(pc, row, column)
@@ -411,7 +410,7 @@ garages, and responding to bumper/button inputs.</p></div>
                                 continue  # Only happens if interrupted
                             distance = pylon_pc[2]
                             # We can drive a bit more forward, but
-                            # the camera wont see the pylon anymore
+                            # the camera won&#39;t see the pylon anymore
                             pylon_local = (pylon_pc[0], distance)
                             target_point_local = extend_vector(
                                 pylon_local, -0.3
@@ -438,7 +437,7 @@ garages, and responding to bumper/button inputs.</p></div>
                     else:
                         angular = 0.4
 
-            # Nemame validni vzdalenost - tocime se na miste a hledame pylon
+            # We don&#39;t have valid distance - rotating in place and searching for pylon
             else:
                 pass
 
@@ -489,7 +488,7 @@ garages, and responding to bumper/button inputs.</p></div>
         Returns:
             None
         &#34;&#34;&#34;
-        print(&#34;returning to garage&#34;)
+        print(&#34;Returning to garage&#34;)
         if not self.approach_garage():
             print(&#34;Failed to approach garage&#34;)
             return
@@ -623,11 +622,8 @@ garages, and responding to bumper/button inputs.</p></div>
 
             # Get the garage midpoint (everything is already in global
             # coordinate space)
-            print(f&#34;left globally: {pillar_1}&#34;)
-            print(f&#34;right globally: {pillar_2}&#34;)
 
             garage_gate = average_vector(pillar_1, pillar_2)
-            print(f&#34;garage_gate: {garage_gate}&#34;)
 
             # Calculate the vector from pillar 1 to pillar 2
             dx = pillar_2[0] - pillar_1[0]
@@ -645,7 +641,6 @@ garages, and responding to bumper/button inputs.</p></div>
             # Make sure the robot is not facing the opposite direction
             if abs(normalize_angle(target_angle - current_yaw)) &gt; math.pi / 2:
                 target_angle = normalize_angle(target_angle + math.pi)
-            print(f&#34;target angle: {target_angle:.3f}&#34;)
 
             if not self._go_to_point_using_odometry(*garage_gate):
                 return False
@@ -735,16 +730,12 @@ garages, and responding to bumper/button inputs.</p></div>
             # Heading error
             angle_error = normalize_angle(desired_yaw - yaw)
 
-            # print(f&#34;Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), &#34;
-            #     f&#34;distance={distance:.2f}, angle_error={angle_error:.2f}&#34;)
-
             # Proportional angular correction
             angular = 0.5 * angle_error
             angular = max(
                 min(angular, MAX_ROTATION_SPEED), -MAX_ROTATION_SPEED
             )  # Clamp
 
-            print(f&#34;Distance: {dist:.2f}, thres: {GARAGE_WALL_DISTANCE:.2f}&#34;)
             if dist &gt; GARAGE_WALL_DISTANCE:
                 self.robot.cmd_velocity(GARAGE_PARKING_LINEAR_SPEED, angular)
             else:
@@ -823,9 +814,6 @@ garages, and responding to bumper/button inputs.</p></div>
 
         # Get the shortest path
         path = nx.dijkstra_path(graph, source=start_point, target=target_point)
-        print(&#34;Calculated path to garage:&#34;)
-        from pprint import pprint
-        pprint(path)
         return path[1:]  # skip the first point since we are already there
 
     def _drive_forward(self, distance: float) -&gt; bool:
@@ -983,9 +971,6 @@ garages, and responding to bumper/button inputs.</p></div>
 
             # heading error
             angle_error = normalize_angle(desired_yaw - yaw)
-
-            # print(f&#34;Position: (x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}), &#34;
-            #     f&#34;distance={distance:.2f}, angle_error={angle_error:.2f}&#34;)
 
             # stop condition
             if distance &lt; GOAL_DISTANCE_TOLERANCE:
