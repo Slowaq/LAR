@@ -13,7 +13,7 @@ from .math_utils import (
 )
 import numpy as np
 import math
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 
 GARAGE_EXIT_ROTATION_SPEED = 0.3
 GOAL_DISTANCE_TOLERANCE = 0.085
@@ -28,7 +28,7 @@ GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
-PYLON_SEARCH_PATH = [(0.7, 0), (0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.6, -0.7)]
+PYLON_SEARCH_PATH = [(0.7, 0), (0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.7, -0.7)]
 
 
 class Algorithm:
@@ -55,11 +55,12 @@ class Algorithm:
         """
         self.stop = False
         self.points_visited = []
+        self.get_point_in_front_of_robot()  # For debugging - visualize point cloud and RGB data
         # self.exit_garage()
-        self.robot.reset_odometry()
-        self.approach_pylon()
+        # self.robot.reset_odometry()
+        # self.approach_pylon()
         # self.drive_around_pylon()
-        self.return_to_garage()
+        # self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
@@ -219,13 +220,15 @@ class Algorithm:
                 return
             self.points_visited.append(point)
 
-            # if self.look_for_pylon():
-            #     return
-            # else:
-            #     print(
-            #         "Couldnt find pylon from this position "
-            #         "- trying different point"
-            #     )
+            if self.look_for_pylon():
+                return
+            else:
+                print(
+                    "Couldnt find pylon from this position "
+                    "- trying different point"
+                )
+
+            
         print("Couldnt find pylon at all")
 
     def look_for_pylon(self) -> bool:
@@ -730,6 +733,63 @@ class Algorithm:
 
         self.robot.cmd_velocity(0, 0)
         return False
+
+    def get_point_in_front_of_robot(self) -> Optional[Tuple[float, float]]:
+        self._wait_for_new_data()
+
+        while True:
+            self.robot.cmd_velocity(0, 0)
+
+            odometry = self.robot.get_odometry()
+            pc = self.robot.get_point_cloud()
+
+            # mask out floor points and points too high
+            mask = -0.2 < pc[:, :, 1] < 0.2
+
+            # mask point that are not in front of the robot
+            mask = np.logical_and(mask, -0.5 < pc[:, :, 0] < 0.5)
+
+            # check obstacle
+            data = np.sort(pc[:, :, 2][mask])
+
+            image = np.zeros(mask.shape)
+
+            import cv2
+            # assign depth i.e. distance to image
+            image[mask] = np.int8(pc[:, :, 2] / 3.0 * 255)
+            im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
+                                        cv2.COLORMAP_JET)
+
+            im_bw = np.int8(pc[:, :, 2] > 1.5)
+
+            # convert to black and white to rgb image
+            im_bw_rgb = cv2.cvtColor(im_bw, cv2.COLOR_GRAY2BGR)
+
+            # stack images horizontally
+            im_stacked = np.hstack((im_color, im_bw_rgb))
+
+            cv2.imshow('obstacles', im_stacked)
+            key = cv2.waitKey(1)
+            if key == ord('q'):
+                cv2.destroyAllWindows()
+                return None
+
+    
+
+
+
+        # if data.size > 50:
+        #     dist = np.percentile(data, 10)
+        #     if dist > 1.5:
+        #         local_point = (0.0, 1.0)  # 1 meter forward
+        #         return local_coords_to_global_coords(
+        #             *local_point,
+        #             odometry
+        #         )
+        # else:
+        #     return None
+
+
 
     def _drive_forward(self, distance: float) -> bool:
         """
