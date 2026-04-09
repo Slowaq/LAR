@@ -756,12 +756,13 @@ class Algorithm:
             image = np.zeros(mask.shape)
 
             import cv2
-            # assign depth i.e. distance to image
-            image[mask] = np.int8(pc[:, :, 2][mask] / 3.0 * 255)
-            im_color = cv2.applyColorMap(255 - image.astype(np.uint8),
-                                        cv2.COLORMAP_JET)
+            # assign depth i.e. distance to image for all points
+            depth_scaled = pc[:, :, 2] / 3.0 * 255
+            depth_scaled = np.nan_to_num(depth_scaled, nan=0, posinf=255, neginf=0)
+            image = np.clip(depth_scaled, 0, 255).astype(np.uint8)
+            im_color = cv2.applyColorMap(255 - image, cv2.COLORMAP_JET)
 
-            im_bw = np.uint8(pc[:, :, 2] > 1.5)
+            im_bw = np.uint8(mask) * 255
 
             # convert to black and white to rgb image
             im_bw_rgb = cv2.cvtColor(im_bw, cv2.COLOR_GRAY2BGR)
