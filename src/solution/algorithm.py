@@ -422,7 +422,7 @@ class Algorithm:
                     else:
                         angular = 0.4
 
-            # We don't have valid distance - rotating in place and searching for pylon
+            # We don't have valid distance - rotating in place
             else:
                 pass
 
