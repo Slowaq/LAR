@@ -55,12 +55,11 @@ class Algorithm:
         """
         self.stop = False
         self.points_visited = []
-        self.get_point_in_front_of_robot()  # For debugging - visualize point cloud and RGB data
-        # self.exit_garage()
-        # self.robot.reset_odometry()
-        # self.approach_pylon()
-        # self.drive_around_pylon()
-        # self.return_to_garage()
+        # self.get_point_in_front_of_robot()  # For debugging - visualize point cloud and RGB data
+        self.exit_garage()
+        self.approach_pylon()
+        self.drive_around_pylon()
+        self.return_to_garage()
 
         if self.stop:
             print("Algorithm exited early")
