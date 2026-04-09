@@ -742,8 +742,13 @@ class Algorithm:
         return False
 
     def _is_space_in_front_of_robot_clear(self) -> bool:
-        """Check if the space in front of the robot is clear using
-        point cloud data."""
+        """
+        Check if the space in front of the robot is clear using
+        point cloud data.
+        
+        Returns:
+            bool: True if there is free space ahead
+        """
         self.robot.cmd_velocity(0, 0)
         self._wait_for_point_cloud()
 
