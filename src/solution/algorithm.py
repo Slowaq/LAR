@@ -12,6 +12,7 @@ from .math_utils import (
 )
 import numpy as np
 import math
+import cv2
 from typing import Tuple, List
 
 GARAGE_EXIT_ROTATION_SPEED = 0.3
@@ -27,7 +28,7 @@ GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 PYLON_SEARCH_RADIUS = 2
 PYLON_SEARCH_POINT_COUNT = 6
-PYLON_SEARCH_PATH = [(0.6, 0), (0.6, 0.6), (-0.6, 0.6), (-0.6, -0.6), (0.6, -0.6)]
+PYLON_SEARCH_PATH = [(0.6, 0)] #, (0.6, 0.6), (-0.6, 0.6), (-0.6, -0.6), (0.6, -0.6)]
 
 
 class Algorithm:
@@ -530,6 +531,10 @@ class Algorithm:
 
             pillars, annotated_brg, image_bw = find_purple_quads(rgb_image)
 
+            cv2.imshow('Annotated BRG', annotated_brg)
+            cv2.imshow('Image BW', image_bw)
+            cv2.waitKey(1)
+
             if not pillars:
                 continue
 
@@ -572,6 +577,8 @@ class Algorithm:
                     # Wait for fresh point cloud and RGB data
                     stop_spinning = True
                     continue
+
+        cv2.destroyAllWindows()
 
         if len(found_pillars) == 2:
             return found_pillars
@@ -986,7 +993,6 @@ class Algorithm:
 
         # Calculate the required angle to face the destination
         target_angle = math.atan2(dest_y - current_y, dest_x - current_x)
-        print(f"Target angle: {target_angle}")
 
         delta_yaw = normalize_angle(target_angle - current_yaw)
 
