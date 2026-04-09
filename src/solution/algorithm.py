@@ -1,4 +1,5 @@
-"""Module implementing the main Algorithm class for TurtleBot navigation and tasks."""
+"""Module implementing the main Algorithm class for TurtleBot navigation
+and tasks."""
 
 from robolab_turtlebot import Turtlebot, sleep
 from .segmentation import find_pylon, find_purple_quads
@@ -29,16 +30,18 @@ HEADING_KP = 5.0
 GARAGE_WALL_DISTANCE = 0.34
 PYLON_AROUND_PATH = [(0.35,  0.0), (0.35, 0.7), (-0.35, 0.7), (-0.35, 0)]
 POINT_IN_FRONT_OF_GARAGE = (0.7, 0)
-CORNER_POINTS_AROUND_GARAGE = [(0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.7, -0.7)]
+CORNER_POINTS_AROUND_GARAGE = [
+    (0.7, 0.7), (-0.7, 0.7), (-0.7, -0.7), (0.7, -0.7)
+]
+
 
 class Algorithm:
-    """Main algorithm class for TurtleBot navigation, obstacle avoidance,
-    and garage parking.
-
-    Handles sensor data processing, path planning, and robot control for
-    autonomous tasks including finding pylons, navigating to garages, and
-    responding to bumper/button inputs.
+    """Main algorithm class for TurtleBot navigation, obstacle avoidance, and
+    garage parking. Handles sensor data processing, path planning, and robot
+    control for autonomous tasks including finding pylons, navigating to
+    garages, and responding to bumper/button inputs.
     """
+
     def __init__(self) -> None:
         self.robot: Turtlebot = Turtlebot(rgb=True, depth=True, pc=True)
 
@@ -217,7 +220,8 @@ class Algorithm:
         Returns:
             None
         """
-        stack_of_points = CORNER_POINTS_AROUND_GARAGE + [POINT_IN_FRONT_OF_GARAGE]
+        stack_of_points = CORNER_POINTS_AROUND_GARAGE + \
+            [POINT_IN_FRONT_OF_GARAGE]
         while stack_of_points:
             point = stack_of_points.pop()
             if not self._go_to_point_using_odometry(*point):
@@ -233,10 +237,11 @@ class Algorithm:
                 return
             else:
                 print(
-                    "Couldn't find pylon from this position - "
-                    "trying different point"
+                    "Couldn't find pylon from this position"
                 )
-                if point in CORNER_POINTS_AROUND_GARAGE or point == POINT_IN_FRONT_OF_GARAGE:
+                in_g = point in CORNER_POINTS_AROUND_GARAGE
+                at_f = point == POINT_IN_FRONT_OF_GARAGE
+                if in_g or at_f:
                     target_yaw = math.atan2(point[1], point[0])
                     if not self._rotate_to_angle(target_yaw):
                         return
@@ -244,17 +249,16 @@ class Algorithm:
                     if self._is_space_in_front_of_robot_clear():
                         print("Going forward since space is clear")
                         odometry = self.robot.get_odometry()
-                        new_point = local_coords_to_global_coords(0, 1.0, odometry)
+                        new_point = local_coords_to_global_coords(
+                            0, 1.0, odometry
+                        )
                         stack_of_points.append(new_point)
                         self.safe_points.append(new_point)
                     else:
                         print("Space in front of robot is not clear")
         else:
-            print("Couldnt find pylon at all")
+            print("Couldn't find pylon at all")
             self.stop = True
-            
-
-            
 
     def look_for_pylon(self) -> bool:
         """
@@ -401,8 +405,10 @@ class Algorithm:
                                 *target_point_local,
                                 odometry
                             )
-                            self.pylon_position = local_coords_to_global_coords(
-                                *pylon_local, odometry
+                            self.pylon_position = (
+                                local_coords_to_global_coords(
+                                    *pylon_local, odometry
+                                )
                             )
 
                             if not self._go_to_point_using_odometry(
@@ -665,7 +671,8 @@ class Algorithm:
                 fails.
         """
         print(
-            f"Driving into garage to a distance of {GARAGE_WALL_DISTANCE:.2f} m from the wall."
+            f"Driving into garage to a distance of "
+            f"{GARAGE_WALL_DISTANCE:.2f} m from the wall."
         )
 
         # Rotate towards garage
@@ -735,7 +742,8 @@ class Algorithm:
         return False
 
     def _is_space_in_front_of_robot_clear(self) -> bool:
-        """Check if the space in front of the robot is clear using point cloud data."""
+        """Check if the space in front of the robot is clear using
+        point cloud data."""
         self.robot.cmd_velocity(0, 0)
         self._wait_for_point_cloud()
 
@@ -757,12 +765,13 @@ class Algorithm:
             dist = np.percentile(data, 10)
             print(f"Free distance: {dist:.3f} m")
             if dist > 1.3:
-                return True    
+                return True
         else:
             return None
 
     def _get_path_to_garage(self) -> List[Tuple[float, float]]:
-        """Compute a path from current position to the garage using graph-based pathfinding."""
+        """Compute a path from current position to the garage using
+        graph-based pathfinding."""
         self._wait_for_odometry()
         odom = self.robot.get_odometry()
         if odom is None:
@@ -781,7 +790,7 @@ class Algorithm:
                 if line_intersects_circle(
                     point_1, point_2,
                     (0, 0),   # origin
-                    0.69     # safe radius around garage   
+                    0.69     # safe radius around garage
                 ):
                     continue
                 if line_intersects_circle(
@@ -797,7 +806,7 @@ class Algorithm:
 
         # Get the shortest path
         path = nx.dijkstra_path(graph, source=start_point, target=target_point)
-        print(f"Calculated path to garage:")
+        print("Calculated path to garage:")
         from pprint import pprint
         pprint(path)
         return path[1:]  # skip the first point since we are already there
@@ -1009,8 +1018,8 @@ class Algorithm:
         return False
 
     def _go_to_point_using_odometry(
-        self, 
-        dest_x: float, 
+        self,
+        dest_x: float,
         dest_y: float,
         go_fast: bool = False
     ) -> bool:
@@ -1066,7 +1075,7 @@ class Algorithm:
         delta_yaw = normalize_angle(target_angle - current_yaw)
 
         if not self._rotate_by_angle(
-            delta_yaw, 
+            delta_yaw,
             go_fast=go_fast
         ):
             print("Rotating towards point failed.")

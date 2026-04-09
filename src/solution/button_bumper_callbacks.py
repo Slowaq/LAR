@@ -16,7 +16,8 @@ BUTTON_B2 = 2
 
 def register_callbacks(algorithm: Algorithm) -> None:
     """
-    Register bumper and button event callbacks on the robot with threaded execution.
+    Register bumper and button event callbacks on the robot with
+    threaded execution.
 
     The callbacks control the algorithm execution state:
     - Any bumper press sets the stop flag to True.
@@ -42,8 +43,8 @@ def register_callbacks(algorithm: Algorithm) -> None:
     def _run_with_guard() -> None:
         """
         Thread worker that manages the algorithm lifecycle.
-        
-        Ensures the 'is_running' flag is cleared and the 'stop' flag is 
+
+        Ensures the 'is_running' flag is cleared and the 'stop' flag is
         set upon completion or failure, allowing for subsequent restarts.
         """
         try:
@@ -58,31 +59,34 @@ def register_callbacks(algorithm: Algorithm) -> None:
         """
         Handle button events using a non-blocking threaded approach.
 
-        If the algorithm is already running, B0 events are discarded to prevent 
-        ROS callback queueing from triggering multiple sequential runs. B1 
+        If the algorithm is already running, B0 events are discarded to prevent
+        ROS callback queueing from triggering multiple sequential runs. B1
         remains active to allow user-interruption.
 
         Args:
             msg (ButtonEvent): Incoming button event message.
         """
         if msg.state == STATE_PRESSED:
-            
-            # 1. Guard: If already running, handle stop signals or ignore start signals
+
+            # 1. Guard: If already running, handle stop signals or
+            # ignore start signals
             if algorithm.is_running:
                 if msg.button == BUTTON_B1:
                     print("Button B1 pressed - stopping execution")
                     algorithm.stop = True
-                return # Exit to discard any queued messages (like multiple B0 presses)
+                return  # Exit to discard any queued messages
+                # (like multiple B0 presses)
 
             # 2. Trigger execution if idle
             if msg.button == BUTTON_B0:
                 print("Button B0 pressed - starting execution in background")
                 algorithm.stop = False
                 algorithm.is_running = True
-                
-                # Offload long-running .run() to a thread to keep the callback responsive
+
+                # Offload long-running .run() to a thread to keep the
+                # callback responsive
                 thread = threading.Thread(target=_run_with_guard)
-                thread.daemon = True # Ensure thread exits if main process dies
+                thread.daemon = True
                 thread.start()
 
     algorithm.robot.register_bumper_event_cb(_bumper_cb)
