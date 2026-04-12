@@ -373,7 +373,7 @@ class Algorithm:
                         0.6
                     )
 
-            # ak máme validnú vzdialenosť
+            # We have valid distance read
             if distance is not None and not np.isnan(distance):
                 if distance > PYLON_APPROACH_DISTANCE:
                     linear = 0.1
